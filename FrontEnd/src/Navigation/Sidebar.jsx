@@ -1,21 +1,29 @@
 function Sidebar({ currentPage, setCurrentPage }) {
+  const navItems = [
+    { key: "home", label: "Home" },
+    { key: "swimmers", label: "Swimmers" },
+    { key: "attendance", label: "Attendance" },
+    { key: "sessions", label: "Sessions" },
+    { key: "payments", label: "Payments" },
+    { key: "settings", label: "Settings" },
+  ];
+
   return (
     <aside className="sidebar">
       <h2 className="sidebar-logo" onClick={() => setCurrentPage("home")}>
         ROGUEWAVE
       </h2>
 
-      <button onClick={() => setCurrentPage("home")}>Home</button>
-
-      <button onClick={() => setCurrentPage("swimmers")}>Swimmers</button>
-
-      <button onClick={() => setCurrentPage("attendance")}>Attendance</button>
-
-      <button onClick={() => setCurrentPage("sessions")}>Sessions</button>
-
-      <button onClick={() => setCurrentPage("payments")}>Payments</button>
-
-      <button onClick={() => setCurrentPage("settings")}>Settings</button>
+      {navItems.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => setCurrentPage(item.key)}
+          aria-current={currentPage === item.key ? "page" : undefined}
+        >
+          {item.label}
+        </button>
+      ))}
     </aside>
   );
 }
