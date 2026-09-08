@@ -14,6 +14,10 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [currentPage, setCurrentPage] = useState("home");
 
+  // Used to reset the Swimmers page when its navigation button
+  // is clicked while already inside Swimmers.
+  const [swimmersResetKey, setSwimmersResetKey] = useState(0);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSplash(false);
@@ -31,10 +35,21 @@ function App() {
     );
   }
 
+  const goToPage = (page) => {
+    // If Swimmers is clicked while already on Swimmers,
+    // reset it back to the swimmer list.
+    if (page === "swimmers" && currentPage === "swimmers") {
+      setSwimmersResetKey((previousKey) => previousKey + 1);
+      return;
+    }
+
+    setCurrentPage(page);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case "swimmers":
-        return <Swimmers />;
+        return <Swimmers key={swimmersResetKey} />;
 
       case "attendance":
         return <Attendance />;
@@ -55,7 +70,7 @@ function App() {
 
   return (
     <div className="home-screen">
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <Sidebar currentPage={currentPage} setCurrentPage={goToPage} />
 
       <main className="home-content">{renderPage()}</main>
     </div>
