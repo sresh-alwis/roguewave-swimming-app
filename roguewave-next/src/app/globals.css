@@ -1,0 +1,161 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Main colours */
+  --background: #eef4f7;
+  --card: #ffffff;
+  --text: #111111;
+  --secondary-text: #666666;
+
+  /* Sidebar */
+  --sidebar: #062b44;
+  --sidebar-text: #ffffff;
+  --sidebar-secondary-text: #b8d3df;
+
+  /* Buttons */
+  --button: #0a6285;
+  --button-text: #ffffff;
+  --secondary-button: #ffffff;
+  --danger: #a83232;
+
+  /* Borders / surfaces */
+  --border: #dddddd;
+  --soft-background: #f7fafb;
+
+  /* Status colours */
+  --success-background: #e7f4ea;
+  --success-text: #24733c;
+
+  --warning-background: #fff3cd;
+  --warning-text: #765d00;
+
+  --danger-background: #fbe9e9;
+  --danger-text: #a83232;
+
+  /* Accent */
+  --accent-background: #e1f1f6;
+  --accent-text: #0a6285;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Main colours */
+  --background: #101820;
+  --card: #1b2730;
+  --text: #f5f7fa;
+  --secondary-text: #b5c0c8;
+
+  /* Sidebar */
+  --sidebar: #061d2b;
+  --sidebar-text: #ffffff;
+  --sidebar-secondary-text: #a8c0cc;
+
+  /* Buttons */
+  --button: #168aad;
+  --button-text: #ffffff;
+  --secondary-button: #25343e;
+  --danger: #b94444;
+
+  /* Borders / surfaces */
+  --border: #394955;
+  --soft-background: #24333d;
+
+  /* Status colours */
+  --success-background: #173b28;
+  --success-text: #8bd6a3;
+
+  --warning-background: #4a3d17;
+  --warning-text: #f3d77b;
+
+  --danger-background: #462323;
+  --danger-text: #f1a0a0;
+
+  /* Accent */
+  --accent-background: #173847;
+  --accent-text: #75c7e0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  background-color: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--button);
+  outline-offset: 1px;
+}
+
+a {
+  color: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+/* Basic mobile preparation */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  main {
+    max-width: 100%;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button {
+    min-height: 42px;
+  }
+}
