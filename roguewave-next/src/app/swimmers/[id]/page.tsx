@@ -1,15 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
-type Schedule = {
-  day: string;
-  startTime: string;
-  endTime: string;
-};
-
-type AssignedSession = {
+type ApiSwimmer = {
   id: number;
   name: string;
-  schedules: Schedule[];
+  level: string;
+  date_of_birth: string | null;
+  date_joined: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  notes: string | null;
+  created_at: string;
 };
 
 type Swimmer = {
@@ -22,82 +26,142 @@ type Swimmer = {
   dateJoined: string;
   sessionsCompleted: number;
   extraDetails: string;
-  assignedSession: AssignedSession | null;
 };
 
-const rogueWaveSession: AssignedSession = {
-  id: 1,
-  name: "RogueWave Learn to Swim",
+export default function SwimmerProfilePage() {
+  const params = useParams<{ id: string }>();
 
-  schedules: [
-    {
-      day: "Thursday",
-      startTime: "7:00 PM",
-      endTime: "8:00 PM",
-    },
-    {
-      day: "Saturday",
-      startTime: "7:00 PM",
-      endTime: "8:00 PM",
-    },
-  ],
-};
+  const swimmerId = params.id;
 
-const swimmers: Swimmer[] = [
-  {
-    id: 1,
-    name: "Isali Rozairo",
-    level: "Beginner",
-    dateOfBirth: "10/05/2012",
-    height: "4 ft 8 in",
-    weight: "38 kg",
-    dateJoined: "07/05/2026",
-    sessionsCompleted: 7,
-    extraDetails: "Working on breathing, body balance and freestyle kick.",
-    assignedSession: rogueWaveSession,
-  },
+  const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
 
-  {
-    id: 2,
-    name: "Pawani Rozairo",
-    level: "Intermediate",
-    dateOfBirth: "15/08/2010",
-    height: "5 ft 1 in",
-    weight: "45 kg",
-    dateJoined: "07/05/2026",
-    sessionsCompleted: 6,
-    extraDetails: "Working on freestyle technique and breathing.",
-    assignedSession: rogueWaveSession,
-  },
+  const [loading, setLoading] = useState(true);
 
-  {
-    id: 3,
-    name: "Swimmer 3",
-    level: "Advanced",
-    dateOfBirth: "20/03/2008",
-    height: "5 ft 6 in",
-    weight: "58 kg",
-    dateJoined: "15/04/2026",
-    sessionsCompleted: 18,
-    extraDetails: "Advanced swimmer training.",
-    assignedSession: rogueWaveSession,
-  },
-];
+  const [error, setError] = useState("");
 
-export default async function SwimmerProfilePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const swimmer = swimmers.find((swimmer) => swimmer.id === Number(id));
+  useEffect(() => {
+    async function loadSwimmer() {
+      try {
+        const response = await fetch(`/api/swimmers/${swimmerId}`, {
+          cache: "no-store",
+        });
 
-  if (!swimmer) {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load swimmer.");
+        }
+
+        const apiSwimmer = data as ApiSwimmer;
+
+        setSwimmer({
+          id: apiSwimmer.id,
+
+          name: apiSwimmer.name,
+
+          level: apiSwimmer.level,
+
+          dateOfBirth: apiSwimmer.date_of_birth
+            ? formatDate(apiSwimmer.date_of_birth)
+            : "Not set",
+
+          height:
+            apiSwimmer.height_cm !== null
+              ? formatHeight(apiSwimmer.height_cm)
+              : "Not set",
+
+          weight:
+            apiSwimmer.weight_kg !== null
+              ? `${apiSwimmer.weight_kg} kg`
+              : "Not set",
+
+          dateJoined: apiSwimmer.date_joined
+            ? formatDate(apiSwimmer.date_joined)
+            : "Not set",
+
+          // Attendance is not connected yet.
+          sessionsCompleted: 0,
+
+          extraDetails: apiSwimmer.notes || "",
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load swimmer.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (swimmerId) {
+      loadSwimmer();
+    }
+  }, [swimmerId]);
+
+  /* =========================
+     DELETE FUNCTION
+  ========================= */
+
+  async function handleDeleteClick() {
+    if (!swimmer) return;
+
+    const confirmed = window.confirm(
+      `Delete ${swimmer.name}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsDeleting(true);
+
+      const response = await fetch(`/api/swimmers/${swimmer.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete swimmer.");
+      }
+
+      // Redirect to swimmers list on success
+      window.location.href = "/swimmers";
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to delete swimmer."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  /* =========================
+     LOADING
+  ========================= */
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <section style={notFoundStyle}>
+          <p>Loading swimmer...</p>
+        </section>
+      </main>
+    );
+  }
+
+  /* =========================
+     ERROR / NOT FOUND
+  ========================= */
+
+  if (error || !swimmer) {
     return (
       <main style={pageStyle}>
         <section style={notFoundStyle}>
           <h1>Swimmer not found</h1>
+
+          <p style={mutedTextStyle}>{error}</p>
 
           <Link href="/swimmers" style={buttonLinkStyle}>
             Back to Swimmers
@@ -110,6 +174,7 @@ export default async function SwimmerProfilePage({
   return (
     <main style={pageStyle}>
       {/* Sidebar */}
+
       <aside style={sidebarStyle}>
         <h2 style={{ margin: 0 }}>ROGUEWAVE</h2>
 
@@ -145,12 +210,20 @@ export default async function SwimmerProfilePage({
       </aside>
 
       {/* Main */}
+
       <section style={mainContentStyle}>
         {/* Header */}
+
         <div style={topStyle}>
           <div>
             <div style={nameRowStyle}>
-              <h1 style={{ margin: 0 }}>{swimmer.name}</h1>
+              <h1
+                style={{
+                  margin: 0,
+                }}
+              >
+                {swimmer.name}
+              </h1>
 
               <span style={levelBadgeStyle}>{swimmer.level}</span>
             </div>
@@ -161,11 +234,22 @@ export default async function SwimmerProfilePage({
           <Link href={`/swimmers/${swimmer.id}/edit`} style={buttonLinkStyle}>
             Edit Swimmer
           </Link>
+
+          <button
+            type="button"
+            onClick={() => handleDeleteClick()}
+            disabled={isDeleting}
+            style={deleteButtonStyle}
+          >
+            {isDeleting ? "Deleting..." : "Delete Swimmer"}
+          </button>
         </div>
 
         {/* Profile Cards */}
+
         <div style={profileGridStyle}>
           {/* Personal */}
+
           <div style={cardStyle}>
             <h2 style={cardTitleStyle}>Personal Details</h2>
 
@@ -182,9 +266,10 @@ export default async function SwimmerProfilePage({
             </div>
           </div>
 
-          {/* Coaching Record */}
+          {/* Training Record */}
+
           <div style={cardStyle}>
-            <h2 style={cardTitleStyle}>Coaching Record</h2>
+            <h2 style={cardTitleStyle}>Training Record</h2>
 
             <div style={sessionCountStyle}>
               <span style={smallLabelStyle}>Sessions Completed</span>
@@ -198,29 +283,7 @@ export default async function SwimmerProfilePage({
 
             <strong>Assigned Session</strong>
 
-            {swimmer.assignedSession ? (
-              <div
-                style={{
-                  marginTop: "12px",
-                }}
-              >
-                <p style={sessionNameStyle}>{swimmer.assignedSession.name}</p>
-
-                <div style={scheduleListStyle}>
-                  {swimmer.assignedSession.schedules.map((schedule) => (
-                    <div key={schedule.day} style={scheduleRowStyle}>
-                      <strong>{schedule.day}</strong>
-
-                      <span>
-                        {schedule.startTime} - {schedule.endTime}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p style={mutedTextStyle}>No session assigned.</p>
-            )}
+            <p style={mutedTextStyle}>No session assigned.</p>
 
             <Link
               href={`/swimmers/${swimmer.id}/attendance-history`}
@@ -231,6 +294,7 @@ export default async function SwimmerProfilePage({
           </div>
 
           {/* Extra Details */}
+
           <div style={cardStyle}>
             <h2 style={cardTitleStyle}>Extra Details</h2>
 
@@ -243,7 +307,12 @@ export default async function SwimmerProfilePage({
         </div>
 
         {/* Back */}
-        <div style={{ marginTop: "25px" }}>
+
+        <div
+          style={{
+            marginTop: "25px",
+          }}
+        >
           <Link href="/swimmers" style={secondaryLinkStyle}>
             Back to Swimmers
           </Link>
@@ -252,6 +321,10 @@ export default async function SwimmerProfilePage({
     </main>
   );
 }
+
+/* =========================
+   COMPONENTS
+========================= */
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -262,6 +335,39 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/* =========================
+   HELPERS
+========================= */
+
+function formatDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatHeight(heightCm: number) {
+  const totalInches = heightCm / 2.54;
+
+  let feet = Math.floor(totalInches / 12);
+
+  let inches = Math.round(totalInches - feet * 12);
+
+  if (inches === 12) {
+    feet += 1;
+    inches = 0;
+  }
+
+  return `${feet} ft ${inches} in`;
+}
+
+/* =========================
+   STYLES
+========================= */
 
 const pageStyle = {
   minHeight: "100vh",
@@ -392,30 +498,6 @@ const dividerStyle = {
   margin: "20px 0",
 };
 
-const sessionNameStyle = {
-  margin: "0 0 10px 0",
-  fontWeight: "bold",
-  color: "var(--accent-text)",
-};
-
-const scheduleListStyle = {
-  display: "flex",
-  flexDirection: "column" as const,
-  gap: "8px",
-};
-
-const scheduleRowStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  flexWrap: "wrap" as const,
-  gap: "15px",
-  backgroundColor: "var(--soft-background)",
-  color: "var(--text)",
-  padding: "10px 12px",
-  borderRadius: "6px",
-  border: "1px solid var(--border)",
-};
-
 const notesStyle = {
   color: "var(--text)",
   lineHeight: 1.6,
@@ -460,3 +542,14 @@ const notFoundStyle = {
   border: "1px solid var(--border)",
   borderRadius: "10px",
 };
+
+  const deleteButtonStyle = {
+    backgroundColor: "var(--danger)",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    padding: "10px 18px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "14px",
+  };

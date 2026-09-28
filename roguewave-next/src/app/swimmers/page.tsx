@@ -1,38 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type Level = "Beginner" | "Intermediate" | "Advanced";
 
 type Swimmer = {
   id: number;
   name: string;
   sessionsCompleted: number;
-  level: "Beginner" | "Intermediate" | "Advanced";
+  level: Level;
 };
 
-const swimmers: Swimmer[] = [
-  {
-    id: 1,
-    name: "Isali Rozairo",
-    sessionsCompleted: 7,
-    level: "Beginner",
-  },
-  {
-    id: 2,
-    name: "Pawani Rozairo",
-    sessionsCompleted: 6,
-    level: "Intermediate",
-  },
-  {
-    id: 3,
-    name: "Swimmer 3",
-    sessionsCompleted: 18,
-    level: "Advanced",
-  },
-];
+type ApiSwimmer = {
+  id: number;
+  name: string;
+  level: string;
+  height_cm: number | null;
+  weight_kg: number | null;
+  notes: string | null;
+  created_at: string;
+};
 
 export default function SwimmersPage() {
+  const [swimmers, setSwimmers] = useState<Swimmer[]>([]);
+
   const [search, setSearch] = useState("");
+
+  const [loading, setLoading] = useState(true);
+
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadSwimmers() {
+      try {
+        const response = await fetch("/api/swimmers", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load swimmers.");
+        }
+
+        const formattedSwimmers: Swimmer[] = (data as ApiSwimmer[]).map(
+          (swimmer) => ({
+            id: swimmer.id,
+
+            name: swimmer.name,
+
+            level: getLevel(swimmer.level),
+
+            // Attendance database is not connected yet.
+            sessionsCompleted: 0,
+          }),
+        );
+
+        setSwimmers(formattedSwimmers);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load swimmers.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSwimmers();
+  }, []);
 
   const filteredSwimmers = swimmers.filter((swimmer) =>
     swimmer.name.toLowerCase().includes(search.toLowerCase().trim()),
@@ -41,6 +77,7 @@ export default function SwimmersPage() {
   return (
     <main style={pageStyle}>
       {/* Sidebar */}
+
       <aside style={sidebarStyle}>
         <h2 style={{ margin: 0 }}>ROGUEWAVE</h2>
 
@@ -76,11 +113,19 @@ export default function SwimmersPage() {
       </aside>
 
       {/* Main Content */}
+
       <section style={mainContentStyle}>
         {/* Heading */}
+
         <div style={topStyle}>
           <div>
-            <h1 style={{ margin: 0 }}>Swimmers</h1>
+            <h1
+              style={{
+                margin: 0,
+              }}
+            >
+              Swimmers
+            </h1>
 
             <p style={subtitleStyle}>
               Manage your swimmers and view their coaching records.
@@ -93,6 +138,7 @@ export default function SwimmersPage() {
         </div>
 
         {/* Search */}
+
         <div style={toolbarStyle}>
           <input
             type="search"
@@ -108,47 +154,95 @@ export default function SwimmersPage() {
           </span>
         </div>
 
-        {/* Swimmer Cards */}
-        {filteredSwimmers.length > 0 ? (
-          <div style={gridStyle}>
-            {filteredSwimmers.map((swimmer) => (
-              <div key={swimmer.id} style={cardStyle}>
-                <div>
-                  <h2
-                    style={{
-                      margin: "0 0 8px 0",
-                    }}
-                  >
-                    {swimmer.name}
-                  </h2>
+        {/* Loading */}
 
-                  <span style={levelBadgeStyle}>{swimmer.level}</span>
-                </div>
-
-                <div style={informationStyle}>
-                  <span style={labelStyle}>Sessions Completed</span>
-
-                  <strong style={sessionNumberStyle}>
-                    {swimmer.sessionsCompleted}
-                  </strong>
-                </div>
-
-                <Link href={`/swimmers/${swimmer.id}`} style={profileLinkStyle}>
-                  <button style={profileButtonStyle}>View Profile</button>
-                </Link>
-              </div>
-            ))}
-          </div>
-        ) : (
+        {loading && (
           <div style={emptyStyle}>
-            <h3 style={{ marginTop: 0 }}>No swimmers found</h3>
-
-            <p style={subtitleStyle}>Try another name or add a new swimmer.</p>
+            <p style={subtitleStyle}>Loading swimmers...</p>
           </div>
         )}
+
+        {/* Error */}
+
+        {!loading && error && (
+          <div style={errorStyle}>
+            <h3
+              style={{
+                marginTop: 0,
+              }}
+            >
+              Could not load swimmers
+            </h3>
+
+            <p style={subtitleStyle}>{error}</p>
+          </div>
+        )}
+
+        {/* Swimmers */}
+
+        {!loading &&
+          !error &&
+          (filteredSwimmers.length > 0 ? (
+            <div style={gridStyle}>
+              {filteredSwimmers.map((swimmer) => (
+                <div key={swimmer.id} style={cardStyle}>
+                  <div>
+                    <h2
+                      style={{
+                        margin: "0 0 8px 0",
+                      }}
+                    >
+                      {swimmer.name}
+                    </h2>
+
+                    <span style={levelBadgeStyle}>{swimmer.level}</span>
+                  </div>
+
+                  <div style={informationStyle}>
+                    <span style={labelStyle}>Sessions Completed</span>
+
+                    <strong style={sessionNumberStyle}>
+                      {swimmer.sessionsCompleted}
+                    </strong>
+                  </div>
+
+                  <Link
+                    href={`/swimmers/${swimmer.id}`}
+                    style={profileLinkStyle}
+                  >
+                    <button style={profileButtonStyle}>View Profile</button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={emptyStyle}>
+              <h3
+                style={{
+                  marginTop: 0,
+                }}
+              >
+                {search.trim() ? "No swimmers found" : "No swimmers yet"}
+              </h3>
+
+              <p style={subtitleStyle}>
+                {search.trim()
+                  ? "Try another name."
+                  : "Add your first swimmer to get started."}
+              </p>
+            </div>
+          ))}
       </section>
     </main>
   );
+}
+
+function getLevel(level: string): Level {
+  if (level === "Intermediate" || level === "Advanced") {
+    return level;
+  }
+
+  return "Beginner";
 }
 
 const pageStyle = {
@@ -304,4 +398,9 @@ const emptyStyle = {
   borderRadius: "10px",
   padding: "40px",
   textAlign: "center" as const,
+};
+
+const errorStyle = {
+  ...emptyStyle,
+  border: "1px solid var(--danger)",
 };

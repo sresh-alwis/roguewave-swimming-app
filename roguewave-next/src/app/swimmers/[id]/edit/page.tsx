@@ -1,97 +1,118 @@
 "use client";
 
 import Link from "next/link";
+
+import { useEffect, useState } from "react";
+
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
 
 type Level = "Beginner" | "Intermediate" | "Advanced";
 
-const swimmers = [
-  {
-    id: 1,
-    name: "Isali Rozairo",
-    dateOfBirth: "2012-05-10",
-    dateJoined: "2026-05-07",
-    level: "Beginner" as Level,
-    heightFeet: 4,
-    heightInches: 8,
-    weight: 38,
-    session: "roguewave",
-    extraDetails: "Working on breathing, body balance and freestyle kick.",
-  },
-  {
-    id: 2,
-    name: "Pawani Rozairo",
-    dateOfBirth: "2010-08-15",
-    dateJoined: "2026-05-07",
-    level: "Intermediate" as Level,
-    heightFeet: 5,
-    heightInches: 1,
-    weight: 45,
-    session: "roguewave",
-    extraDetails: "Working on freestyle technique and breathing.",
-  },
-  {
-    id: 3,
-    name: "Swimmer 3",
-    dateOfBirth: "2008-03-20",
-    dateJoined: "2026-04-15",
-    level: "Advanced" as Level,
-    heightFeet: 5,
-    heightInches: 6,
-    weight: 58,
-    session: "roguewave",
-    extraDetails: "Advanced swimmer training.",
-  },
-];
+type ApiSwimmer = {
+  id: number;
+  name: string;
+  level: string;
+  date_of_birth: string | null;
+  date_joined: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  notes: string | null;
+};
 
 export default function EditSwimmerPage() {
-  const params = useParams();
+  const params = useParams<{
+    id: string;
+  }>();
+
   const router = useRouter();
 
-  const swimmerId = Number(params.id);
+  const swimmerId = params.id;
 
-  const swimmer = swimmers.find((swimmer) => swimmer.id === swimmerId);
+  const [name, setName] = useState("");
 
-  const [name, setName] = useState(swimmer?.name ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState("");
 
-  const [dateOfBirth, setDateOfBirth] = useState(swimmer?.dateOfBirth ?? "");
+  const [dateJoined, setDateJoined] = useState("");
 
-  const [dateJoined, setDateJoined] = useState(swimmer?.dateJoined ?? "");
+  const [level, setLevel] = useState<Level>("Beginner");
 
-  const [level, setLevel] = useState<Level>(swimmer?.level ?? "Beginner");
+  const [heightFeet, setHeightFeet] = useState("");
 
-  const [heightFeet, setHeightFeet] = useState(
-    swimmer?.heightFeet.toString() ?? "",
-  );
+  const [heightInches, setHeightInches] = useState("");
 
-  const [heightInches, setHeightInches] = useState(
-    swimmer?.heightInches.toString() ?? "",
-  );
+  const [weight, setWeight] = useState("");
 
-  const [weight, setWeight] = useState(swimmer?.weight.toString() ?? "");
+  const [extraDetails, setExtraDetails] = useState("");
 
-  const [assignedSession, setAssignedSession] = useState(
-    swimmer?.session ?? "",
-  );
+  const [loading, setLoading] = useState(true);
 
-  const [extraDetails, setExtraDetails] = useState(swimmer?.extraDetails ?? "");
+  const [saving, setSaving] = useState(false);
 
-  if (!swimmer) {
-    return (
-      <main style={pageStyle}>
-        <section style={formCardStyle}>
-          <h1>Swimmer not found</h1>
+  const [error, setError] = useState("");
 
-          <Link href="/swimmers" style={buttonLinkStyle}>
-            Back to Swimmers
-          </Link>
-        </section>
-      </main>
-    );
-  }
+  /* =========================
+     LOAD SWIMMER
+  ========================= */
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    async function loadSwimmer() {
+      try {
+        const response = await fetch(`/api/swimmers/${swimmerId}`, {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load swimmer.");
+        }
+
+        const swimmer = data as ApiSwimmer;
+
+        setName(swimmer.name);
+
+        setDateOfBirth(swimmer.date_of_birth || "");
+
+        setDateJoined(swimmer.date_joined || "");
+
+        if (swimmer.level === "Intermediate" || swimmer.level === "Advanced") {
+          setLevel(swimmer.level);
+        } else {
+          setLevel("Beginner");
+        }
+
+        if (swimmer.height_cm !== null) {
+          const { feet, inches } = convertCmToFeetInches(swimmer.height_cm);
+
+          setHeightFeet(feet.toString());
+
+          setHeightInches(inches.toString());
+        }
+
+        if (swimmer.weight_kg !== null) {
+          setWeight(swimmer.weight_kg.toString());
+        }
+
+        setExtraDetails(swimmer.notes || "");
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load swimmer.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (swimmerId) {
+      loadSwimmer();
+    }
+  }, [swimmerId]);
+
+  /* =========================
+     UPDATE SWIMMER
+  ========================= */
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!name.trim()) {
@@ -99,7 +120,17 @@ export default function EditSwimmerPage() {
       return;
     }
 
-    if (new Date(dateJoined) < new Date(dateOfBirth)) {
+    if (!dateOfBirth) {
+      alert("Please enter the date of birth.");
+      return;
+    }
+
+    if (!dateJoined) {
+      alert("Please enter the date joined.");
+      return;
+    }
+
+    if (dateJoined < dateOfBirth) {
       alert("Date Joined cannot be before the swimmer's date of birth.");
       return;
     }
@@ -110,40 +141,123 @@ export default function EditSwimmerPage() {
 
     const swimmerWeight = Number(weight);
 
-    if (feet < 1 || feet > 8) {
+    if (!heightFeet || feet < 1 || feet > 8) {
       alert("Please enter a valid height in feet.");
       return;
     }
 
-    if (inches < 0 || inches > 11) {
+    if (heightInches === "" || inches < 0 || inches > 11) {
       alert("Height inches must be between 0 and 11.");
       return;
     }
 
-    if (swimmerWeight <= 0 || swimmerWeight > 300) {
+    if (!weight || swimmerWeight <= 0 || swimmerWeight > 300) {
       alert("Please enter a valid weight.");
       return;
     }
 
-    alert("Swimmer updated - database will be connected later.");
+    const heightCm = Math.round((feet * 30.48 + inches * 2.54) * 10) / 10;
 
-    router.push(`/swimmers/${swimmerId}`);
+    try {
+      setSaving(true);
+
+      const response = await fetch(`/api/swimmers/${swimmerId}`, {
+        method: "PATCH",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name: name.trim(),
+
+          level,
+
+          date_of_birth: dateOfBirth,
+
+          date_joined: dateJoined,
+
+          height_cm: heightCm,
+
+          weight_kg: swimmerWeight,
+
+          notes: extraDetails.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update swimmer.");
+      }
+
+      alert("Swimmer updated successfully.");
+
+      router.push(`/swimmers/${swimmerId}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update swimmer.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* =========================
+     LOADING
+  ========================= */
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <section style={formCardStyle}>
+          <p>Loading swimmer...</p>
+        </section>
+      </main>
+    );
+  }
+
+  /* =========================
+     ERROR
+  ========================= */
+
+  if (error) {
+    return (
+      <main style={pageStyle}>
+        <section style={formCardStyle}>
+          <h1>Swimmer not found</h1>
+
+          <p style={subtitleStyle}>{error}</p>
+
+          <Link href="/swimmers" style={buttonLinkStyle}>
+            Back to Swimmers
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   return (
     <main style={pageStyle}>
       <section style={formCardStyle}>
         {/* Heading */}
+
         <div style={headingStyle}>
-          <h1 style={{ margin: 0 }}>Edit Swimmer</h1>
+          <h1
+            style={{
+              margin: 0,
+            }}
+          >
+            Edit Swimmer
+          </h1>
 
           <p style={subtitleStyle}>
-            Update {swimmer.name}&apos;s profile information.
+            Update {name}
+            &apos;s profile information.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={formStyle}>
           {/* Personal Details */}
+
           <div>
             <h2 style={sectionTitleStyle}>Personal Details</h2>
 
@@ -202,6 +316,7 @@ export default function EditSwimmerPage() {
           </div>
 
           {/* Measurements */}
+
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Measurements</h2>
 
@@ -248,46 +363,49 @@ export default function EditSwimmerPage() {
             </div>
           </div>
 
-          {/* Coaching Details */}
+          {/* Training Details */}
+
           <div style={sectionStyle}>
-            <h2 style={sectionTitleStyle}>Coaching Details</h2>
+            <h2 style={sectionTitleStyle}>Training Details</h2>
 
-            <div style={formStyle}>
-              <label>
-                Assigned Session
-                <select
-                  value={assignedSession}
-                  onChange={(e) => setAssignedSession(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">No Session Assigned</option>
+            <p style={helperTextStyle}>
+              Session assignment will be connected in the next step.
+            </p>
 
-                  <option value="roguewave">RogueWave Learn to Swim</option>
-                </select>
-              </label>
-
-              <label>
-                Extra Details <span style={optionalStyle}>(Optional)</span>
-                <textarea
-                  rows={4}
-                  value={extraDetails}
-                  onChange={(e) => setExtraDetails(e.target.value)}
-                  style={textareaStyle}
-                />
-              </label>
-            </div>
+            <label>
+              Extra Details <span style={optionalStyle}>(Optional)</span>
+              <textarea
+                rows={4}
+                value={extraDetails}
+                onChange={(e) => setExtraDetails(e.target.value)}
+                placeholder="Optional training notes or other information..."
+                style={textareaStyle}
+              />
+            </label>
           </div>
 
           {/* Actions */}
+
           <div style={buttonRowStyle}>
-            <button type="submit" style={buttonStyle}>
-              Update Swimmer
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                ...buttonStyle,
+
+                opacity: saving ? 0.6 : 1,
+
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? "Updating..." : "Update Swimmer"}
             </button>
 
             <button
               type="button"
+              disabled={saving}
               style={closeButtonStyle}
-              onClick={() => router.push(`/swimmers/${swimmer.id}`)}
+              onClick={() => router.push(`/swimmers/${swimmerId}`)}
             >
               Close
             </button>
@@ -297,6 +415,32 @@ export default function EditSwimmerPage() {
     </main>
   );
 }
+
+/* =========================
+   HELPERS
+========================= */
+
+function convertCmToFeetInches(heightCm: number) {
+  const totalInches = heightCm / 2.54;
+
+  let feet = Math.floor(totalInches / 12);
+
+  let inches = Math.round(totalInches - feet * 12);
+
+  if (inches === 12) {
+    feet += 1;
+    inches = 0;
+  }
+
+  return {
+    feet,
+    inches,
+  };
+}
+
+/* =========================
+   STYLES
+========================= */
 
 const pageStyle = {
   minHeight: "100vh",
@@ -376,6 +520,12 @@ const textareaStyle = {
 const optionalStyle = {
   color: "var(--secondary-text)",
   fontSize: "13px",
+};
+
+const helperTextStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "13px",
+  margin: "0 0 18px 0",
 };
 
 const buttonRowStyle = {

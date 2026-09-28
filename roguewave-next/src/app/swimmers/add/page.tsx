@@ -9,7 +9,9 @@ export default function AddSwimmerPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
+
   const [dateOfBirth, setDateOfBirth] = useState("");
+
   const [dateJoined, setDateJoined] = useState("");
 
   const [level, setLevel] = useState<SwimmingLevel>("");
@@ -24,7 +26,9 @@ export default function AddSwimmerPage() {
 
   const [extraDetails, setExtraDetails] = useState("");
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!name.trim()) {
@@ -42,7 +46,7 @@ export default function AddSwimmerPage() {
       return;
     }
 
-    if (new Date(dateJoined) < new Date(dateOfBirth)) {
+    if (dateJoined < dateOfBirth) {
       alert("Date joined cannot be before the date of birth.");
       return;
     }
@@ -53,7 +57,9 @@ export default function AddSwimmerPage() {
     }
 
     const feet = Number(heightFeet);
+
     const inches = Number(heightInches);
+
     const swimmerWeight = Number(weight);
 
     if (!heightFeet || feet < 1 || feet > 8) {
@@ -71,23 +77,84 @@ export default function AddSwimmerPage() {
       return;
     }
 
-    alert("Swimmer saved - database will be connected later.");
+    /*
+      Convert feet/inches to cm
+      before storing in database.
+    */
 
-    router.push("/swimmers");
+    const heightCm = Math.round((feet * 30.48 + inches * 2.54) * 10) / 10;
+
+    try {
+      setSaving(true);
+
+      const response = await fetch("/api/swimmers", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name: name.trim(),
+
+          level,
+
+          date_of_birth: dateOfBirth,
+
+          date_joined: dateJoined,
+
+          height_cm: heightCm,
+
+          weight_kg: swimmerWeight,
+
+          notes: extraDetails.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create swimmer.");
+      }
+
+      if (assignedSession) {
+        alert(
+          "Swimmer saved successfully. Session assignment will be connected next.",
+        );
+      } else {
+        alert("Swimmer saved successfully.");
+      }
+
+      router.push("/swimmers");
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Failed to create swimmer.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <main style={pageStyle}>
       <section style={formCardStyle}>
         {/* Heading */}
+
         <div style={headingStyle}>
-          <h1 style={{ margin: 0 }}>Add Swimmer</h1>
+          <h1
+            style={{
+              margin: 0,
+            }}
+          >
+            Add Swimmer
+          </h1>
 
           <p style={subtitleStyle}>Add a swimmer and their coaching details.</p>
         </div>
 
         <form onSubmit={handleSubmit} style={formStyle}>
           {/* Personal Details */}
+
           <div>
             <h2 style={sectionTitleStyle}>Personal Details</h2>
 
@@ -147,6 +214,7 @@ export default function AddSwimmerPage() {
           </div>
 
           {/* Measurements */}
+
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Measurements</h2>
 
@@ -197,6 +265,7 @@ export default function AddSwimmerPage() {
           </div>
 
           {/* Coaching Details */}
+
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Coaching Details</h2>
 
@@ -215,6 +284,10 @@ export default function AddSwimmerPage() {
               </select>
             </label>
 
+            <p style={helperTextStyle}>
+              Session assignment will be connected to the database next.
+            </p>
+
             <label style={detailsLabelStyle}>
               Extra Details
               <textarea
@@ -228,13 +301,25 @@ export default function AddSwimmerPage() {
           </div>
 
           {/* Actions */}
+
           <div style={buttonRowStyle}>
-            <button type="submit" style={buttonStyle}>
-              Save Swimmer
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                ...buttonStyle,
+
+                opacity: saving ? 0.6 : 1,
+
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? "Saving..." : "Save Swimmer"}
             </button>
 
             <button
               type="button"
+              disabled={saving}
               onClick={() => router.push("/swimmers")}
               style={closeButtonStyle}
             >
@@ -310,6 +395,12 @@ const inputStyle = {
   color: "var(--text)",
   border: "1px solid var(--border)",
   borderRadius: "5px",
+};
+
+const helperTextStyle = {
+  margin: "8px 0 0 0",
+  color: "var(--secondary-text)",
+  fontSize: "13px",
 };
 
 const detailsLabelStyle = {
