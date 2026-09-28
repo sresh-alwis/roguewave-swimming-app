@@ -17,6 +17,21 @@ type ApiSwimmer = {
   height_cm: number | null;
   weight_kg: number | null;
   notes: string | null;
+  session: {
+    id: number;
+    name: string;
+  } | null;
+};
+
+type ApiSession = {
+  id: number;
+  name: string;
+  role: string;
+  session_type: string;
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
 };
 
 export default function EditSwimmerPage() {
@@ -49,6 +64,36 @@ export default function EditSwimmerPage() {
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
+
+  const [sessions, setSessions] = useState<ApiSession[]>([]);
+
+  const [assignedSession, setAssignedSession] = useState("");
+
+  /* =========================
+     LOAD SESSIONS
+  ========================= */
+
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const response = await fetch("/api/sessions", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load sessions.");
+        }
+
+        setSessions(data as ApiSession[]);
+      } catch {
+        // Silently fail — dropdown will just be empty
+      }
+    }
+
+    loadSessions();
+  }, []);
 
   /* =========================
      LOAD SWIMMER
@@ -94,6 +139,10 @@ export default function EditSwimmerPage() {
         }
 
         setExtraDetails(swimmer.notes || "");
+
+        if (swimmer.session) {
+          setAssignedSession(swimmer.session.id.toString());
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load swimmer.",
@@ -182,6 +231,8 @@ export default function EditSwimmerPage() {
           weight_kg: swimmerWeight,
 
           notes: extraDetails.trim() || null,
+
+          session_id: assignedSession ? Number(assignedSession) : null,
         }),
       });
 
@@ -368,11 +419,24 @@ export default function EditSwimmerPage() {
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Training Details</h2>
 
-            <p style={helperTextStyle}>
-              Session assignment will be connected in the next step.
-            </p>
-
             <label>
+              Assigned Session
+              <select
+                value={assignedSession}
+                onChange={(e) => setAssignedSession(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">No Session Assigned</option>
+
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={detailsLabelStyle}>
               Extra Details <span style={optionalStyle}>(Optional)</span>
               <textarea
                 rows={4}
@@ -522,10 +586,9 @@ const optionalStyle = {
   fontSize: "13px",
 };
 
-const helperTextStyle = {
-  color: "var(--secondary-text)",
-  fontSize: "13px",
-  margin: "0 0 18px 0",
+const detailsLabelStyle = {
+  display: "block",
+  marginTop: "18px",
 };
 
 const buttonRowStyle = {

@@ -1,9 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type SwimmingLevel = "" | "Beginner" | "Intermediate" | "Advanced";
+
+type ApiSession = {
+  id: number;
+  name: string;
+  role: string;
+  session_type: string;
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+};
 
 export default function AddSwimmerPage() {
   const router = useRouter();
@@ -27,6 +38,34 @@ export default function AddSwimmerPage() {
   const [extraDetails, setExtraDetails] = useState("");
 
   const [saving, setSaving] = useState(false);
+
+  const [sessions, setSessions] = useState<ApiSession[]>([]);
+
+  /* =========================
+     LOAD SESSIONS
+  ========================= */
+
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const response = await fetch("/api/sessions", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load sessions.");
+        }
+
+        setSessions(data as ApiSession[]);
+      } catch {
+        // Silently fail — dropdown will just be empty
+      }
+    }
+
+    loadSessions();
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,6 +147,8 @@ export default function AddSwimmerPage() {
           weight_kg: swimmerWeight,
 
           notes: extraDetails.trim() || null,
+
+          session_id: assignedSession ? Number(assignedSession) : null,
         }),
       });
 
@@ -117,13 +158,7 @@ export default function AddSwimmerPage() {
         throw new Error(data.error || "Failed to create swimmer.");
       }
 
-      if (assignedSession) {
-        alert(
-          "Swimmer saved successfully. Session assignment will be connected next.",
-        );
-      } else {
-        alert("Swimmer saved successfully.");
-      }
+      alert("Swimmer saved successfully.");
 
       router.push("/swimmers");
     } catch (error) {
@@ -278,15 +313,13 @@ export default function AddSwimmerPage() {
               >
                 <option value="">No Session Assigned</option>
 
-                <option value="RogueWave Learn to Swim">
-                  RogueWave Learn to Swim
-                </option>
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.name}
+                  </option>
+                ))}
               </select>
             </label>
-
-            <p style={helperTextStyle}>
-              Session assignment will be connected to the database next.
-            </p>
 
             <label style={detailsLabelStyle}>
               Extra Details
@@ -395,12 +428,6 @@ const inputStyle = {
   color: "var(--text)",
   border: "1px solid var(--border)",
   borderRadius: "5px",
-};
-
-const helperTextStyle = {
-  margin: "8px 0 0 0",
-  color: "var(--secondary-text)",
-  fontSize: "13px",
 };
 
 const detailsLabelStyle = {
