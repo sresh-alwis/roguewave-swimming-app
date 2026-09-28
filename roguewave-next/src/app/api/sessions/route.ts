@@ -22,6 +22,13 @@ export async function GET() {
         day_of_week,
         start_time,
         end_time
+      ),
+      session_swimmers (
+        swimmers (
+          id,
+          name,
+          level
+        )
       )
     `,
     )
@@ -60,6 +67,7 @@ export async function POST(request: Request) {
       session_date,
       start_time,
       end_time,
+      swimmer_ids,
     } = body;
 
     /* -------------------------
@@ -264,6 +272,65 @@ export async function POST(request: Request) {
         );
       }
     }
+
+    /* =========================
+       CREATE SWIMMER RELATIONSHIPS
+    ========================= */
+
+    /*
+       If swimmer_ids is supplied, create session-swimmer assignments.
+       This is done after the session and schedules are created to handle
+       cleanup properly if the relationship creation fails.
+    */
+
+    if (Array.isArray(swimmer_ids) && swimmer_ids.length > 0) {
+        // Validate that all swimmer IDs are valid numbers
+        const allValidNumbers = swimmer_ids.every(
+          (id) => typeof id === "number" && Number.isFinite(id) && id > 0,
+        );
+
+        if (!allValidNumbers) {
+          // Clean up the session and schedules
+          await supabaseServer.from("session_schedules").delete().eq("session_id", session.id);
+          await supabaseServer.from("sessions").delete().eq("id", session.id);
+
+          return NextResponse.json(
+            {
+              error: "swimmer_ids must be an array of valid numeric IDs.",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
+
+        // Deduplicate swimmer IDs
+        const uniqueSwimmerIds = [...new Set(swimmer_ids)];
+
+        const relationshipRows = uniqueSwimmerIds.map((swimmerId) => ({
+          session_id: session.id,
+          swimmer_id: swimmerId,
+        }));
+
+        const { error: insertError } = await supabaseServer
+          .from("session_swimmers")
+          .insert(relationshipRows);
+
+        if (insertError) {
+          // Clean up the session and schedules if relationship creation fails
+          await supabaseServer.from("session_schedules").delete().eq("session_id", session.id);
+          await supabaseServer.from("sessions").delete().eq("id", session.id);
+
+          return NextResponse.json(
+            {
+              error: insertError.message,
+            },
+            {
+              status: 500,
+            },
+          );
+        }
+      }
 
     return NextResponse.json(
       {

@@ -3,6 +3,22 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 const validLevels = ["Beginner", "Intermediate", "Advanced"];
 
+type SessionSwimmerWithSession = {
+  swimmer_id: number;
+  session_id: number;
+  sessions: {
+    id: number;
+    name: string;
+    role: string;
+    session_type: string;
+    default_location: string | null;
+    session_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    session_schedules: { id: number; day_of_week: number; start_time: string; end_time: string }[];
+  } | null;
+};
+
 /* =========================
    GET ONE SWIMMER
 ========================= */
@@ -54,7 +70,42 @@ export async function GET(
     );
   }
 
-  return NextResponse.json(data);
+  // Get assigned session information for this swimmer
+  const { data: sessionRelationships, error: sessionRelationshipsError } = await supabaseServer
+    .from("session_swimmers")
+    .select(
+      `sessions (
+        id,
+        name,
+        role,
+        session_type,
+        default_location,
+        session_date,
+        start_time,
+        end_time,
+        session_schedules (
+          id,
+          day_of_week,
+          start_time,
+          end_time
+        )
+      )`
+    )
+    .eq("swimmer_id", swimmerId);
+
+  if (sessionRelationshipsError) {
+    return NextResponse.json({ error: sessionRelationshipsError.message }, { status: 500 });
+  }
+
+  // Transform the data to include session information (V1: one session), filtering out null joins
+  const enrichedData = {
+    ...data,
+    session: ((sessionRelationships ?? []) as unknown as SessionSwimmerWithSession[])
+      .map((item) => item.sessions)
+      .find((session): session is NonNullable<typeof session> => session !== null) || null,
+  };
+
+  return NextResponse.json(enrichedData);
 }
 
 /* =========================
@@ -91,6 +142,7 @@ export async function PATCH(
       height_cm,
       weight_kg,
       notes,
+      session_id,
     } = body;
 
     if (!name?.trim()) {
@@ -210,6 +262,73 @@ export async function PATCH(
         },
       );
     }
+
+    /* =========================
+       HANDLE SESSION RELATIONSHIP
+    ========================= */
+
+    /*
+       If session_id is supplied, handle session-swimmer assignment.
+       For the current V1 UI, we treat this as one selected session:
+       - When session_id is provided, remove existing assignments and create new one
+       - When session_id is null, leave them with no assigned session
+    */
+
+    if (session_id !== undefined) {
+        // Validate session_id: must be null or a valid numeric ID
+        if (session_id !== null) {
+          const sessionId = Number(session_id);
+          if (Number.isNaN(sessionId) || !Number.isFinite(sessionId) || sessionId <= 0) {
+            return NextResponse.json(
+              {
+                error: "Invalid session ID provided.",
+              },
+              {
+                status: 400,
+              },
+            );
+          }
+        }
+
+        // First, remove all existing relationships for this swimmer
+        const { error: deleteError } = await supabaseServer
+          .from("session_swimmers")
+          .delete()
+          .eq("swimmer_id", swimmerId);
+
+        if (deleteError) {
+          return NextResponse.json(
+            {
+              error: deleteError.message,
+            },
+            {
+              status: 500,
+            },
+          );
+        }
+
+        // If session_id is not null, create new relationship (V1: one session)
+        if (session_id !== null) {
+          const sessionId = Number(session_id);
+          const { error: insertError } = await supabaseServer
+            .from("session_swimmers")
+            .insert({
+              session_id: sessionId,
+              swimmer_id: swimmerId,
+            });
+
+          if (insertError) {
+            return NextResponse.json(
+              {
+                error: insertError.message,
+              },
+              {
+                status: 500,
+              },
+            );
+          }
+        }
+      }
 
     return NextResponse.json({
       message: "Swimmer updated successfully.",
