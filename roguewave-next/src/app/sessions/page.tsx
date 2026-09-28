@@ -34,14 +34,17 @@ type ApiSession = {
   role: "Head Coach" | "Assistant Coach";
   session_type: string;
   default_location: string | null;
+
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+
   session_schedules: ApiSchedule[];
 };
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -74,6 +77,18 @@ export default function SessionsPage() {
 
             // Swimmer relationship is not connected yet.
             swimmers: 0,
+
+            date: session.session_date
+              ? formatDate(session.session_date)
+              : undefined,
+
+            startTime: session.start_time
+              ? formatTime(session.start_time)
+              : undefined,
+
+            endTime: session.end_time
+              ? formatTime(session.end_time)
+              : undefined,
 
             schedules: (session.session_schedules || [])
               .sort((a, b) => a.day_of_week - b.day_of_week)
@@ -131,14 +146,9 @@ export default function SessionsPage() {
   return (
     <main style={pageStyle}>
       {/* Sidebar */}
+
       <aside style={sidebarStyle}>
-        <h2
-          style={{
-            margin: 0,
-          }}
-        >
-          ROGUEWAVE
-        </h2>
+        <h2 style={{ margin: 0 }}>ROGUEWAVE</h2>
 
         <p style={sidebarSubtitleStyle}>Coaching Management</p>
 
@@ -172,6 +182,7 @@ export default function SessionsPage() {
       </aside>
 
       {/* Main Content */}
+
       <section style={mainContentStyle}>
         <div style={topStyle}>
           <div>
@@ -194,6 +205,7 @@ export default function SessionsPage() {
         </div>
 
         {/* Loading */}
+
         {loading && (
           <div style={emptyStyle}>
             <p style={mutedTextStyle}>Loading sessions...</p>
@@ -201,6 +213,7 @@ export default function SessionsPage() {
         )}
 
         {/* Error */}
+
         {!loading && error && (
           <div style={errorStyle}>
             <strong>Could not load sessions.</strong>
@@ -210,6 +223,7 @@ export default function SessionsPage() {
         )}
 
         {/* Session Cards */}
+
         {!loading && !error && (
           <div style={sessionListStyle}>
             {sessions.map((session) => (
@@ -221,6 +235,7 @@ export default function SessionsPage() {
                   }}
                 >
                   {/* Header */}
+
                   <div style={cardHeaderStyle}>
                     <div>
                       <h2
@@ -237,7 +252,8 @@ export default function SessionsPage() {
                     <span style={badgeStyle}>{session.type}</span>
                   </div>
 
-                  {/* Recurring Schedule */}
+                  {/* Recurring */}
+
                   {session.type === "Recurring" && (
                     <div
                       style={{
@@ -268,6 +284,7 @@ export default function SessionsPage() {
                   )}
 
                   {/* One-Off */}
+
                   {session.type === "Once" && (
                     <div
                       style={{
@@ -292,6 +309,7 @@ export default function SessionsPage() {
                   )}
 
                   {/* Swimmers */}
+
                   <div
                     style={{
                       marginTop: "18px",
@@ -308,6 +326,7 @@ export default function SessionsPage() {
                 </div>
 
                 {/* Actions */}
+
                 <div style={actionStyle}>
                   <Link
                     href={`/sessions/edit/${session.id}`}
@@ -335,6 +354,7 @@ export default function SessionsPage() {
             ))}
 
             {/* Empty State */}
+
             {sessions.length === 0 && (
               <div style={emptyStyle}>
                 <h3>No sessions yet</h3>
@@ -354,6 +374,10 @@ export default function SessionsPage() {
     </main>
   );
 }
+
+/* =========================
+   HELPERS
+========================= */
 
 function getDayName(dayOfWeek: number) {
   const days = [
@@ -380,6 +404,20 @@ function formatTime(time: string) {
 
   return `${displayHour}:${minute} ${period}`;
 }
+
+function formatDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/* =========================
+   STYLES
+========================= */
 
 const pageStyle = {
   minHeight: "100vh",

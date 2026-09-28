@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams, useRouter } from "next/navigation";
 
 type SessionType = "recurring" | "once" | "";
@@ -23,9 +24,19 @@ type ApiSchedule = {
 type ApiSession = {
   id: number;
   name: string;
+
   role: "Head Coach" | "Assistant Coach";
+
   session_type: string;
+
   default_location: string | null;
+
+  session_date: string | null;
+
+  start_time: string | null;
+
+  end_time: string | null;
+
   session_schedules: ApiSchedule[];
 };
 
@@ -41,7 +52,10 @@ const days = [
 
 export default function EditSessionPage() {
   const router = useRouter();
-  const params = useParams<{ id: string }>();
+
+  const params = useParams<{
+    id: string;
+  }>();
 
   const sessionId = params.id;
 
@@ -52,6 +66,12 @@ export default function EditSessionPage() {
   const [role, setRole] = useState<Role>("");
 
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+
+  const [sessionDate, setSessionDate] = useState("");
+
+  const [onceStartTime, setOnceStartTime] = useState("");
+
+  const [onceEndTime, setOnceEndTime] = useState("");
 
   const [loading, setLoading] = useState(true);
 
@@ -80,11 +100,26 @@ export default function EditSessionPage() {
 
         setClassName(session.name);
 
-        setSessionType(
-          session.session_type.toLowerCase() === "once" ? "once" : "recurring",
-        );
+        const type =
+          session.session_type.toLowerCase() === "once" ? "once" : "recurring";
+
+        setSessionType(type);
 
         setRole(session.role === "Head Coach" ? "head" : "assistant");
+
+        /* One-Off */
+
+        setSessionDate(session.session_date || "");
+
+        setOnceStartTime(
+          session.start_time ? formatTimeForInput(session.start_time) : "",
+        );
+
+        setOnceEndTime(
+          session.end_time ? formatTimeForInput(session.end_time) : "",
+        );
+
+        /* Recurring */
 
         const loadedSchedules = (session.session_schedules || [])
           .sort((a, b) => a.day_of_week - b.day_of_week)
@@ -176,56 +211,99 @@ export default function EditSessionPage() {
       return;
     }
 
-    if (!role) {
-      alert("Please select your role.");
-
-      return;
-    }
-
     if (!sessionType) {
       alert("Please select a session type.");
 
       return;
     }
 
+    if (!role) {
+      alert("Please select your role.");
+
+      return;
+    }
+
+    /* Recurring */
+
+    if (sessionType === "recurring") {
+      const invalidSchedule = schedules.some(
+        (schedule) => !schedule.day || !schedule.startTime || !schedule.endTime,
+      );
+
+      if (invalidSchedule) {
+        alert("Please complete all schedule rows.");
+
+        return;
+      }
+
+      const selectedDays = schedules.map((schedule) => schedule.day);
+
+      if (new Set(selectedDays).size !== selectedDays.length) {
+        alert("The same day cannot be added twice.");
+
+        return;
+      }
+
+      const invalidTime = schedules.some(
+        (schedule) => schedule.startTime >= schedule.endTime,
+      );
+
+      if (invalidTime) {
+        alert("End time must be after the start time.");
+
+        return;
+      }
+    }
+
+    /* One-Off */
+
     if (sessionType === "once") {
-      alert("One-off session database support is not connected yet.");
+      if (!sessionDate || !onceStartTime || !onceEndTime) {
+        alert("Please complete the date and time.");
 
-      return;
-    }
+        return;
+      }
 
-    const invalidSchedule = schedules.some(
-      (schedule) => !schedule.day || !schedule.startTime || !schedule.endTime,
-    );
+      if (onceStartTime >= onceEndTime) {
+        alert("End time must be after the start time.");
 
-    if (invalidSchedule) {
-      alert("Please complete all schedule rows.");
-
-      return;
-    }
-
-    const selectedDays = schedules.map((schedule) => schedule.day);
-
-    const duplicateDays = new Set(selectedDays).size !== selectedDays.length;
-
-    if (duplicateDays) {
-      alert("The same day cannot be added twice.");
-
-      return;
-    }
-
-    const invalidTime = schedules.some(
-      (schedule) => schedule.startTime >= schedule.endTime,
-    );
-
-    if (invalidTime) {
-      alert("End time must be after the start time.");
-
-      return;
+        return;
+      }
     }
 
     try {
       setSaving(true);
+
+      const requestBody =
+        sessionType === "recurring"
+          ? {
+              name: className.trim(),
+
+              role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+              session_type: "recurring",
+
+              schedules: schedules.map((schedule) => ({
+                day_of_week: getDayNumber(schedule.day),
+
+                start_time: schedule.startTime,
+
+                end_time: schedule.endTime,
+              })),
+            }
+          : {
+              name: className.trim(),
+
+              role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+              session_type: "once",
+
+              session_date: sessionDate,
+
+              start_time: onceStartTime,
+
+              end_time: onceEndTime,
+            };
 
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
@@ -234,21 +312,7 @@ export default function EditSessionPage() {
           "Content-Type": "application/json",
         },
 
-        body: JSON.stringify({
-          name: className.trim(),
-
-          role: role === "head" ? "Head Coach" : "Assistant Coach",
-
-          session_type: "recurring",
-
-          schedules: schedules.map((schedule) => ({
-            day_of_week: getDayNumber(schedule.day),
-
-            start_time: schedule.startTime,
-
-            end_time: schedule.endTime,
-          })),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -268,7 +332,7 @@ export default function EditSessionPage() {
   }
 
   /* =========================
-     LOADING / ERROR
+     LOADING
   ========================= */
 
   if (loading) {
@@ -280,6 +344,10 @@ export default function EditSessionPage() {
       </main>
     );
   }
+
+  /* =========================
+     ERROR
+  ========================= */
 
   if (error) {
     return (
@@ -300,10 +368,6 @@ export default function EditSessionPage() {
     );
   }
 
-  /* =========================
-     PAGE
-  ========================= */
-
   return (
     <main style={pageStyle}>
       <section style={formCardStyle}>
@@ -320,7 +384,7 @@ export default function EditSessionPage() {
         </div>
 
         <form onSubmit={handleSubmit} style={formStyle}>
-          {/* Class Name */}
+          {/* Name */}
 
           <label>
             Name of Class
@@ -333,7 +397,7 @@ export default function EditSessionPage() {
             />
           </label>
 
-          {/* Session Type */}
+          {/* Type */}
 
           <label>
             Session Type
@@ -470,10 +534,40 @@ export default function EditSessionPage() {
                 One-Off Session
               </h2>
 
-              <p style={subtitleStyle}>
-                One-off session editing will be connected when one-off session
-                storage is added.
-              </p>
+              <div style={onceGridStyle}>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={sessionDate}
+                    onChange={(e) => setSessionDate(e.target.value)}
+                    required
+                    style={inputStyle}
+                  />
+                </label>
+
+                <label>
+                  Start Time
+                  <input
+                    type="time"
+                    value={onceStartTime}
+                    onChange={(e) => setOnceStartTime(e.target.value)}
+                    required
+                    style={inputStyle}
+                  />
+                </label>
+
+                <label>
+                  End Time
+                  <input
+                    type="time"
+                    value={onceEndTime}
+                    onChange={(e) => setOnceEndTime(e.target.value)}
+                    required
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
             </div>
           )}
 
@@ -487,8 +581,6 @@ export default function EditSessionPage() {
                 ...buttonStyle,
 
                 opacity: saving ? 0.6 : 1,
-
-                cursor: saving ? "not-allowed" : "pointer",
               }}
             >
               {saving ? "Updating..." : "Update Session"}
@@ -608,6 +700,13 @@ const scheduleRowStyle = {
   backgroundColor: "var(--soft-background)",
   border: "1px solid var(--border)",
   borderRadius: "8px",
+};
+
+const onceGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "15px",
+  marginTop: "15px",
 };
 
 const buttonRowStyle = {

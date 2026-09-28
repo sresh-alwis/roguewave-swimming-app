@@ -144,45 +144,92 @@ export default function AddSessionPage() {
       return;
     }
 
+    /* =========================
+       RECURRING VALIDATION
+    ========================= */
+
+    if (sessionType === "recurring") {
+      const invalidSchedule = schedules.some(
+        (schedule) => !schedule.day || !schedule.startTime || !schedule.endTime,
+      );
+
+      if (invalidSchedule) {
+        alert("Please complete all recurring schedule rows.");
+        return;
+      }
+
+      const selectedDays = schedules.map((schedule) => schedule.day);
+
+      const duplicateDays = new Set(selectedDays).size !== selectedDays.length;
+
+      if (duplicateDays) {
+        alert("The same day cannot be added twice.");
+        return;
+      }
+
+      const invalidTime = schedules.some(
+        (schedule) => schedule.startTime >= schedule.endTime,
+      );
+
+      if (invalidTime) {
+        alert("End time must be after the start time.");
+        return;
+      }
+    }
+
+    /* =========================
+       ONE-OFF VALIDATION
+    ========================= */
+
     if (sessionType === "once") {
       if (!sessionDate || !onceStartTime || !onceEndTime) {
         alert("Please complete the date and time.");
         return;
       }
 
-      alert("One-off session database support will be connected later.");
-      return;
-    }
-
-    const invalidSchedule = schedules.some(
-      (schedule) => !schedule.day || !schedule.startTime || !schedule.endTime,
-    );
-
-    if (invalidSchedule) {
-      alert("Please complete all recurring schedule rows.");
-      return;
-    }
-
-    const selectedDays = schedules.map((schedule) => schedule.day);
-
-    const duplicateDays = new Set(selectedDays).size !== selectedDays.length;
-
-    if (duplicateDays) {
-      alert("The same day cannot be added twice.");
-      return;
-    }
-
-    const invalidTime = schedules.some(
-      (schedule) => schedule.startTime >= schedule.endTime,
-    );
-
-    if (invalidTime) {
-      alert("End time must be after the start time.");
-      return;
+      if (onceStartTime >= onceEndTime) {
+        alert("End time must be after the start time.");
+        return;
+      }
     }
 
     try {
       setSaving(true);
+
+      const requestBody =
+        sessionType === "recurring"
+          ? {
+              name: className.trim(),
+
+              role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+              session_type: "recurring",
+
+              default_location: null,
+
+              schedules: schedules.map((schedule) => ({
+                day_of_week: getDayNumber(schedule.day),
+
+                start_time: schedule.startTime,
+
+                end_time: schedule.endTime,
+              })),
+            }
+          : {
+              name: className.trim(),
+
+              role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+              session_type: "once",
+
+              default_location: null,
+
+              session_date: sessionDate,
+
+              start_time: onceStartTime,
+
+              end_time: onceEndTime,
+            };
 
       const response = await fetch("/api/sessions", {
         method: "POST",
@@ -191,23 +238,7 @@ export default function AddSessionPage() {
           "Content-Type": "application/json",
         },
 
-        body: JSON.stringify({
-          name: className.trim(),
-
-          role: role === "head" ? "Head Coach" : "Assistant Coach",
-
-          session_type: "recurring",
-
-          default_location: null,
-
-          schedules: schedules.map((schedule) => ({
-            day_of_week: getDayNumber(schedule.day),
-
-            start_time: schedule.startTime,
-
-            end_time: schedule.endTime,
-          })),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -253,6 +284,7 @@ export default function AddSessionPage() {
 
         <form onSubmit={handleSubmit} style={formStyle}>
           {/* Class Name */}
+
           <label>
             Name of Class
             <input
@@ -266,6 +298,7 @@ export default function AddSessionPage() {
           </label>
 
           {/* Session Type */}
+
           <label>
             Session Type
             <select
@@ -283,6 +316,7 @@ export default function AddSessionPage() {
           </label>
 
           {/* Role */}
+
           <label>
             My Role
             <select
@@ -300,6 +334,7 @@ export default function AddSessionPage() {
           </label>
 
           {/* Recurring */}
+
           {sessionType === "recurring" && (
             <div style={sectionStyle}>
               <h2
@@ -388,6 +423,7 @@ export default function AddSessionPage() {
           )}
 
           {/* One-Off */}
+
           {sessionType === "once" && (
             <div style={sectionStyle}>
               <h2
@@ -436,6 +472,7 @@ export default function AddSessionPage() {
           )}
 
           {/* Swimmers */}
+
           <div style={sectionStyle}>
             <h2
               style={{
@@ -470,13 +507,16 @@ export default function AddSessionPage() {
           </div>
 
           {/* Actions */}
+
           <div style={buttonRowStyle}>
             <button
               type="submit"
               disabled={saving}
               style={{
                 ...buttonStyle,
+
                 opacity: saving ? 0.6 : 1,
+
                 cursor: saving ? "not-allowed" : "pointer",
               }}
             >
@@ -498,6 +538,10 @@ export default function AddSessionPage() {
   );
 }
 
+/* =========================
+   HELPERS
+========================= */
+
 function getDayNumber(day: string) {
   const dayNumbers: Record<string, number> = {
     Sunday: 0,
@@ -511,6 +555,10 @@ function getDayNumber(day: string) {
 
   return dayNumbers[day];
 }
+
+/* =========================
+   STYLES
+========================= */
 
 const pageStyle = {
   minHeight: "100vh",
