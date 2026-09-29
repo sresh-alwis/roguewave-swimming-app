@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 
 type Schedule = {
@@ -21,6 +21,26 @@ type Session = {
   role: "Head Coach" | "Assistant Coach";
   defaultLocation: string;
   schedules: Schedule[];
+  swimmers: Swimmer[];
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+};
+
+type ApiSession = {
+  id: number;
+  name: string;
+  role: "Head Coach" | "Assistant Coach";
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  session_schedules: {
+    id: number;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
   swimmers: Swimmer[];
 };
 
@@ -49,74 +69,6 @@ type CoachAttendanceRecord = {
 type AttendanceRecord = SwimmerAttendanceRecord | CoachAttendanceRecord;
 
 type AttendanceStore = Record<string, AttendanceRecord>;
-
-const sessions: Session[] = [
-  {
-    id: 1,
-    name: "RogueWave Learn to Swim",
-    role: "Head Coach",
-    defaultLocation: "President's College Pool",
-
-    schedules: [
-      {
-        dayOfWeek: 4,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-      {
-        dayOfWeek: 6,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-    ],
-
-    swimmers: [
-      {
-        id: 1,
-        name: "Isali Rozairo",
-      },
-      {
-        id: 2,
-        name: "Pawani Rozairo",
-      },
-      {
-        id: 3,
-        name: "Swimmer 3",
-      },
-      {
-        id: 4,
-        name: "Swimmer 4",
-      },
-    ],
-  },
-
-  {
-    id: 2,
-    name: "Coach Gayani Adult Class",
-    role: "Assistant Coach",
-    defaultLocation: "Swimming Pool",
-
-    schedules: [
-      {
-        dayOfWeek: 3,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-      {
-        dayOfWeek: 6,
-        startTime: "18:00",
-        endTime: "19:00",
-      },
-      {
-        dayOfWeek: 0,
-        startTime: "18:00",
-        endTime: "19:00",
-      },
-    ],
-
-    swimmers: [],
-  },
-];
 
 const initialSavedAttendance: AttendanceStore = {
   "1-2026-09-24": {
@@ -168,80 +120,114 @@ function AttendanceContent({
 }: {
   sessionId: number;
 }) {
-  const session = sessions.find((session) => session.id === sessionId);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [records, setRecords] = useState<AttendanceStore>(
     initialSavedAttendance,
   );
 
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryDate = urlParams.get("date");
-    return queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
-      ? queryDate
-      : getTodayKey();
-  });
+  const [selectedDate, setSelectedDate] = useState("");
 
   const [editing, setEditing] = useState(false);
 
-  const [presentSwimmers, setPresentSwimmers] = useState<number[]>(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryDate = urlParams.get("date");
-    const initialDate =
-      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
-        ? queryDate
-        : getTodayKey();
-    const key = `${sessionId}-${initialDate}`;
-    const existing = initialSavedAttendance[key];
-    return existing?.kind === "swimmers" ? existing.swimmerIds : [];
-  });
+  const [presentSwimmers, setPresentSwimmers] = useState<number[]>([]);
 
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus>(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryDate = urlParams.get("date");
-    const initialDate =
-      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
-        ? queryDate
-        : getTodayKey();
-    const key = `${sessionId}-${initialDate}`;
-    const existing = initialSavedAttendance[key];
-    return (existing?.kind === "swimmers"
-      ? existing.sessionStatus
-      : "normal") as SessionStatus;
-  });
+  const [sessionStatus, setSessionStatus] =
+    useState<SessionStatus>("normal");
 
-  const [coachStatus, setCoachStatus] = useState<CoachStatus>(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryDate = urlParams.get("date");
-    const initialDate =
-      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
-        ? queryDate
-        : getTodayKey();
-    const key = `${sessionId}-${initialDate}`;
-    const existing = initialSavedAttendance[key];
-    return (existing?.kind === "coach"
-      ? existing.coachStatus
-      : "present") as CoachStatus;
-  });
+  const [coachStatus, setCoachStatus] = useState<CoachStatus>("present");
 
-  const [location, setLocation] = useState<string>(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryDate = urlParams.get("date");
-    const initialDate =
-      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
-        ? queryDate
-        : getTodayKey();
-    const key = `${sessionId}-${initialDate}`;
-    const existing = initialSavedAttendance[key];
-    const targetSession = sessions.find((s) => s.id === sessionId);
-    return existing?.location || targetSession?.defaultLocation || "";
-  });
+  const [location, setLocation] = useState("");
 
-  if (!session) {
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}`, {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load session.");
+        }
+
+        const apiSession = data as ApiSession;
+
+        const loadedSession: Session = {
+          id: apiSession.id,
+          name: apiSession.name,
+          role: apiSession.role,
+          defaultLocation: apiSession.default_location || "",
+          schedules: (apiSession.session_schedules || []).map((s) => ({
+            dayOfWeek: s.day_of_week,
+            startTime: s.start_time,
+            endTime: s.end_time,
+          })),
+          swimmers: apiSession.swimmers || [],
+          date: apiSession.session_date || undefined,
+          startTime: apiSession.start_time || undefined,
+          endTime: apiSession.end_time || undefined,
+        };
+
+        setSession(loadedSession);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryDate = urlParams.get("date");
+        const initialDate =
+          queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+            ? queryDate
+            : getTodayKey();
+
+        setSelectedDate(initialDate);
+
+        const key = `${sessionId}-${initialDate}`;
+        const existing = initialSavedAttendance[key];
+
+        if (existing?.kind === "swimmers") {
+          setPresentSwimmers(existing.swimmerIds);
+          setSessionStatus(existing.sessionStatus);
+          setLocation(existing.location);
+        } else if (existing?.kind === "coach") {
+          setCoachStatus(existing.coachStatus);
+          setLocation(existing.location);
+        } else {
+          setPresentSwimmers([]);
+          setSessionStatus("normal");
+          setCoachStatus("present");
+          setLocation(loadedSession.defaultLocation);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load session.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSession();
+  }, [sessionId]);
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <section style={cardStyle}>
+          <p>Loading attendance...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (error || !session) {
     return (
       <main style={pageStyle}>
         <section style={cardStyle}>
           <h1>Session not found</h1>
+
+          <p style={helperTextStyle}>{error}</p>
 
           <Link href="/attendance" style={buttonLinkStyle}>
             Back to Attendance
@@ -253,7 +239,9 @@ function AttendanceContent({
 
   const currentSession = session;
 
-  const hasSwimmers = currentSession.swimmers.length > 0;
+  const isHeadCoach = currentSession.role === "Head Coach";
+
+  const hasSwimmers = isHeadCoach && currentSession.swimmers.length > 0;
 
   const savedKey = `${sessionId}-${selectedDate}`;
 
@@ -434,8 +422,8 @@ function AttendanceContent({
                   <span style={smallLabelStyle}>Session Time</span>
 
                   <strong>
-                    {formatTime(selectedSchedule.startTime)} -{" "}
-                    {formatTime(selectedSchedule.endTime)}
+                    {formatTime(selectedSchedule.startTime || "")} -{" "}
+                    {formatTime(selectedSchedule.endTime || "")}
                   </strong>
                 </div>
               )}
@@ -470,7 +458,16 @@ function AttendanceContent({
                   <div style={markedBoxStyle}>✓ Attendance Already Marked</div>
                 )}
 
-                {/* Swimmer Attendance */}
+                {/* Swimmer Attendance — Head Coach */}
+                {isHeadCoach && !hasSwimmers && (
+                  <div style={sectionStyle}>
+                    <p style={helperTextStyle}>
+                      No swimmers assigned to this session.
+                    </p>
+                  </div>
+                )}
+
+                {/* Swimmer Attendance — Head Coach with swimmers */}
                 {hasSwimmers && (
                   <div style={sectionStyle}>
                     <h2
@@ -546,7 +543,7 @@ function AttendanceContent({
                 )}
 
                 {/* Assistant Coach Attendance */}
-                {!hasSwimmers && (
+                {!isHeadCoach && (
                   <div style={sectionStyle}>
                     <h2
                       style={{
@@ -638,6 +635,12 @@ function getScheduleForDate(session: Session, date: string) {
     return null;
   }
 
+  // One-off sessions: match against session_date
+  if (session.schedules.length === 0 && session.date) {
+    return session.date === date ? { startTime: session.startTime, endTime: session.endTime } : null;
+  }
+
+  // Recurring sessions: match against day_of_week
   const dayOfWeek = selected.getDay();
 
   return (

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 type Schedule = {
   day: string;
@@ -12,56 +15,89 @@ type Session = {
   role: "Head Coach" | "Assistant Coach";
   swimmers: number;
   schedules: Schedule[];
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
 };
 
-const sessions: Session[] = [
-  {
-    id: 1,
-    name: "RogueWave Learn to Swim",
-    role: "Head Coach",
-    swimmers: 4,
+type ApiSchedule = {
+  id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
 
-    schedules: [
-      {
-        day: "Thursday",
-        startTime: "7:00 PM",
-        endTime: "8:00 PM",
-      },
-      {
-        day: "Saturday",
-        startTime: "7:00 PM",
-        endTime: "8:00 PM",
-      },
-    ],
-  },
-
-  {
-    id: 2,
-    name: "Coach Gayani Adult Class",
-    role: "Assistant Coach",
-    swimmers: 0,
-
-    schedules: [
-      {
-        day: "Wednesday",
-        startTime: "7:00 PM",
-        endTime: "8:00 PM",
-      },
-      {
-        day: "Saturday",
-        startTime: "6:00 PM",
-        endTime: "7:00 PM",
-      },
-      {
-        day: "Sunday",
-        startTime: "6:00 PM",
-        endTime: "7:00 PM",
-      },
-    ],
-  },
-];
+type ApiSession = {
+  id: number;
+  name: string;
+  role: "Head Coach" | "Assistant Coach";
+  session_type: string;
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  session_schedules: ApiSchedule[];
+  swimmers: { id: number; name: string; level: string }[];
+};
 
 export default function AttendancePage() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const response = await fetch("/api/sessions", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load sessions.");
+        }
+
+        const formattedSessions: Session[] = (data as ApiSession[]).map(
+          (session) => ({
+            id: session.id,
+            name: session.name,
+            role: session.role,
+            swimmers: session.swimmers?.length || 0,
+            schedules: (session.session_schedules || [])
+              .sort((a, b) => a.day_of_week - b.day_of_week)
+              .map((schedule) => ({
+                day: getDayName(schedule.day_of_week),
+                startTime: formatTime(schedule.start_time),
+                endTime: formatTime(schedule.end_time),
+              })),
+            date: session.session_date
+              ? formatDate(session.session_date)
+              : undefined,
+            startTime: session.start_time
+              ? formatTime(session.start_time)
+              : undefined,
+            endTime: session.end_time
+              ? formatTime(session.end_time)
+              : undefined,
+            location: session.default_location || undefined,
+          }),
+        );
+
+        setSessions(formattedSessions);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load sessions.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSessions();
+  }, []);
+
   return (
     <main style={pageStyle}>
       {/* Sidebar */}
@@ -109,81 +145,171 @@ export default function AttendancePage() {
           </p>
         </div>
 
-        <div style={sessionListStyle}>
-          {sessions.map((session) => (
-            <div key={session.id} style={cardStyle}>
-              <div
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                {/* Session Header */}
-                <div style={cardHeaderStyle}>
-                  <div>
-                    <h2
-                      style={{
-                        margin: "0 0 6px 0",
-                      }}
-                    >
-                      {session.name}
-                    </h2>
+        {/* Loading */}
+        {loading && (
+          <div style={emptyStyle}>
+            <p style={subtitleStyle}>Loading sessions...</p>
+          </div>
+        )}
 
-                    <p style={roleStyle}>{session.role}</p>
-                  </div>
+        {/* Error */}
+        {!loading && error && (
+          <div style={errorStyle}>
+            <strong>Could not load sessions.</strong>
 
-                  {session.swimmers > 0 ? (
-                    <span style={swimmerBadgeStyle}>
-                      {session.swimmers} swimmers
-                    </span>
-                  ) : (
-                    <span style={assistantBadgeStyle}>My attendance only</span>
-                  )}
-                </div>
+            <p style={subtitleStyle}>{error}</p>
+          </div>
+        )}
 
-                {/* Schedule */}
-                <div style={{ marginTop: "20px" }}>
-                  <strong>Schedule</strong>
-
-                  <div style={scheduleListStyle}>
-                    {session.schedules.map((schedule) => (
-                      <div
-                        key={`${session.id}-${schedule.day}`}
-                        style={scheduleRowStyle}
-                      >
-                        <span style={dayStyle}>{schedule.day}</span>
-
-                        <span>
-                          {schedule.startTime} - {schedule.endTime}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Explanation */}
-                <p style={helperTextStyle}>
-                  {session.swimmers > 0
-                    ? "Mark each swimmer as present or absent."
-                    : "Record your own coaching attendance for this session."}
-                </p>
-              </div>
-
-              {/* Action */}
-              <div style={actionStyle}>
-                <Link
-                  href={`/attendance/${session.id}`}
-                  style={actionLinkStyle}
+        {/* Sessions */}
+        {!loading && !error && (
+          <div style={sessionListStyle}>
+            {sessions.map((session) => (
+              <div key={session.id} style={cardStyle}>
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                  }}
                 >
-                  <button style={buttonStyle}>Mark Attendance</button>
+                  {/* Session Header */}
+                  <div style={cardHeaderStyle}>
+                    <div>
+                      <h2
+                        style={{
+                          margin: "0 0 6px 0",
+                        }}
+                      >
+                        {session.name}
+                      </h2>
+
+                      <p style={roleStyle}>{session.role}</p>
+                    </div>
+
+                    {session.swimmers > 0 ? (
+                      <span style={swimmerBadgeStyle}>
+                        {session.swimmers} swimmers
+                      </span>
+                    ) : (
+                      <span style={assistantBadgeStyle}>My attendance only</span>
+                    )}
+                  </div>
+
+                  {/* Schedule */}
+                  <div style={{ marginTop: "20px" }}>
+                    <strong>
+                      {session.schedules.length > 0 ? "Schedule" : "Session Date"}
+                    </strong>
+
+                    <div style={scheduleListStyle}>
+                      {session.schedules.length > 0 ? (
+                        session.schedules.map((schedule) => (
+                          <div
+                            key={`${session.id}-${schedule.day}`}
+                            style={scheduleRowStyle}
+                          >
+                            <span style={dayStyle}>{schedule.day}</span>
+
+                            <span>
+                              {schedule.startTime} - {schedule.endTime}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={scheduleRowStyle}>
+                          <span style={dayStyle}>{session.date || "Not set"}</span>
+
+                          <span>
+                            {session.startTime || "-"} -{" "}
+                            {session.endTime || "-"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  {session.location && (
+                    <p style={locationStyle}>
+                      <strong>Location:</strong> {session.location}
+                    </p>
+                  )}
+
+                  {/* Explanation */}
+                  <p style={helperTextStyle}>
+                    {session.swimmers > 0
+                      ? "Mark each swimmer as present or absent."
+                      : "Record your own coaching attendance for this session."}
+                  </p>
+                </div>
+
+                {/* Action */}
+                <div style={actionStyle}>
+                  <Link
+                    href={`/attendance/${session.id}`}
+                    style={actionLinkStyle}
+                  >
+                    <button style={buttonStyle}>Mark Attendance</button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+
+            {/* Empty State */}
+            {sessions.length === 0 && (
+              <div style={emptyStyle}>
+                <h3>No sessions yet</h3>
+
+                <p style={subtitleStyle}>
+                  Add your first coaching session to get started.
+                </p>
+
+                <Link href="/sessions/add">
+                  <button style={buttonStyle}>+ Add Session</button>
                 </Link>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
+}
+
+function getDayName(dayOfWeek: number) {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  return days[dayOfWeek] ?? "Unknown";
+}
+
+function formatTime(time: string) {
+  const [hourText, minute] = time.split(":");
+
+  const hour = Number(hourText);
+
+  const period = hour >= 12 ? "PM" : "AM";
+
+  const displayHour = hour % 12 || 12;
+
+  return `${displayHour}:${minute} ${period}`;
+}
+
+function formatDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const pageStyle = {
@@ -314,6 +440,12 @@ const dayStyle = {
   fontWeight: "bold",
 };
 
+const locationStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "14px",
+  margin: "12px 0 0 0",
+};
+
 const helperTextStyle = {
   color: "var(--secondary-text)",
   fontSize: "14px",
@@ -339,4 +471,18 @@ const buttonStyle = {
   padding: "10px 18px",
   cursor: "pointer",
   fontWeight: "bold",
+};
+
+const emptyStyle = {
+  backgroundColor: "var(--card)",
+  color: "var(--text)",
+  padding: "40px",
+  textAlign: "center" as const,
+  borderRadius: "10px",
+  border: "1px solid var(--border)",
+};
+
+const errorStyle = {
+  ...emptyStyle,
+  border: "1px solid var(--danger)",
 };
