@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type SessionType = "recurring" | "once" | "";
@@ -13,6 +13,12 @@ type ScheduleRow = {
   endTime: string;
 };
 
+type ApiSwimmer = {
+  id: number;
+  name: string;
+  level: string;
+};
+
 const days = [
   "Monday",
   "Tuesday",
@@ -21,25 +27,6 @@ const days = [
   "Friday",
   "Saturday",
   "Sunday",
-];
-
-const prototypeSwimmers = [
-  {
-    id: 1,
-    name: "Isali Rozairo",
-  },
-  {
-    id: 2,
-    name: "Pawani Rozairo",
-  },
-  {
-    id: 3,
-    name: "Swimmer 3",
-  },
-  {
-    id: 4,
-    name: "Swimmer 4",
-  },
 ];
 
 export default function AddSessionPage() {
@@ -77,6 +64,30 @@ function AddSessionForm() {
   const [selectedSwimmers, setSelectedSwimmers] = useState<number[]>([]);
 
   const [saving, setSaving] = useState(false);
+
+  const [swimmers, setSwimmers] = useState<ApiSwimmer[]>([]);
+
+  useEffect(() => {
+    async function loadSwimmers() {
+      try {
+        const response = await fetch("/api/swimmers", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load swimmers.");
+        }
+
+        setSwimmers(data as ApiSwimmer[]);
+      } catch {
+        // Silently fail — swimmer list will be empty
+      }
+    }
+
+    loadSwimmers();
+  }, []);
 
   function updateSchedule(
     index: number,
@@ -204,16 +215,20 @@ function AddSessionForm() {
     try {
       setSaving(true);
 
+      const baseBody = {
+        name: className.trim(),
+
+        role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+        default_location: null,
+      };
+
       const requestBody =
         sessionType === "recurring"
           ? {
-              name: className.trim(),
-
-              role: role === "head" ? "Head Coach" : "Assistant Coach",
+              ...baseBody,
 
               session_type: "recurring",
-
-              default_location: null,
 
               schedules: schedules.map((schedule) => ({
                 day_of_week: getDayNumber(schedule.day),
@@ -222,21 +237,21 @@ function AddSessionForm() {
 
                 end_time: schedule.endTime,
               })),
+
+              swimmer_ids: selectedSwimmers,
             }
           : {
-              name: className.trim(),
-
-              role: role === "head" ? "Head Coach" : "Assistant Coach",
+              ...baseBody,
 
               session_type: "once",
-
-              default_location: null,
 
               session_date: sessionDate,
 
               start_time: onceStartTime,
 
               end_time: onceEndTime,
+
+              swimmer_ids: selectedSwimmers,
             };
 
       const response = await fetch("/api/sessions", {
@@ -255,13 +270,7 @@ function AddSessionForm() {
         throw new Error(data.error || "Failed to create session.");
       }
 
-      if (selectedSwimmers.length > 0) {
-        alert(
-          "Session saved successfully. Swimmer assignments will be connected later.",
-        );
-      } else {
-        alert("Session saved successfully.");
-      }
+      alert("Session saved successfully.");
 
       router.push("/sessions");
     } catch (error) {
@@ -494,19 +503,23 @@ function AddSessionForm() {
               Select swimmers only if they belong to this session.
             </p>
 
-            <div style={swimmerListStyle}>
-              {prototypeSwimmers.map((swimmer) => (
-                <label key={swimmer.id} style={swimmerCheckboxStyle}>
-                  <input
-                    type="checkbox"
-                    checked={selectedSwimmers.includes(swimmer.id)}
-                    onChange={() => toggleSwimmer(swimmer.id)}
-                  />
+            {swimmers.length === 0 ? (
+              <p style={subtitleStyle}>No swimmers available.</p>
+            ) : (
+              <div style={swimmerListStyle}>
+                {swimmers.map((swimmer) => (
+                  <label key={swimmer.id} style={swimmerCheckboxStyle}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSwimmers.includes(swimmer.id)}
+                      onChange={() => toggleSwimmer(swimmer.id)}
+                    />
 
-                  {swimmer.name}
-                </label>
-              ))}
-            </div>
+                    {swimmer.name} — {swimmer.level}
+                  </label>
+                ))}
+              </div>
+            )}
 
             <p style={selectedCountStyle}>
               {selectedSwimmers.length} swimmer

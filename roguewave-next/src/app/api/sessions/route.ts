@@ -307,6 +307,49 @@ export async function POST(request: Request) {
         // Deduplicate swimmer IDs
         const uniqueSwimmerIds = [...new Set(swimmer_ids)];
 
+        // Preserve existing assignments before removing them (for rollback on failure)
+        const { data: previousAssignments, error: fetchPrevError } = await supabaseServer
+          .from("session_swimmers")
+          .select("session_id, swimmer_id")
+          .in("swimmer_id", uniqueSwimmerIds);
+
+        if (fetchPrevError) {
+          // Clean up the session and schedules
+          await supabaseServer.from("session_schedules").delete().eq("session_id", session.id);
+          await supabaseServer.from("sessions").delete().eq("id", session.id);
+
+          return NextResponse.json(
+            {
+              error: fetchPrevError.message,
+            },
+            {
+              status: 500,
+            },
+          );
+        }
+
+        // V1: Enforce one-session-per-swimmer.
+        // Remove any existing assignments for these swimmers before creating new ones.
+        const { error: deletePrevError } = await supabaseServer
+          .from("session_swimmers")
+          .delete()
+          .in("swimmer_id", uniqueSwimmerIds);
+
+        if (deletePrevError) {
+          // Clean up the session and schedules
+          await supabaseServer.from("session_schedules").delete().eq("session_id", session.id);
+          await supabaseServer.from("sessions").delete().eq("id", session.id);
+
+          return NextResponse.json(
+            {
+              error: deletePrevError.message,
+            },
+            {
+              status: 500,
+            },
+          );
+        }
+
         const relationshipRows = uniqueSwimmerIds.map((swimmerId) => ({
           session_id: session.id,
           swimmer_id: swimmerId,
@@ -317,6 +360,11 @@ export async function POST(request: Request) {
           .insert(relationshipRows);
 
         if (insertError) {
+          // Restore previous assignments on failure
+          if (previousAssignments && previousAssignments.length > 0) {
+            await supabaseServer.from("session_swimmers").insert(previousAssignments);
+          }
+
           // Clean up the session and schedules if relationship creation fails
           await supabaseServer.from("session_schedules").delete().eq("session_id", session.id);
           await supabaseServer.from("sessions").delete().eq("id", session.id);

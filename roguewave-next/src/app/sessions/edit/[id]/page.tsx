@@ -21,6 +21,12 @@ type ApiSchedule = {
   end_time: string;
 };
 
+type ApiSwimmer = {
+  id: number;
+  name: string;
+  level: string;
+};
+
 type ApiSession = {
   id: number;
   name: string;
@@ -38,6 +44,8 @@ type ApiSession = {
   end_time: string | null;
 
   session_schedules: ApiSchedule[];
+
+  swimmers: ApiSwimmer[];
 };
 
 const days = [
@@ -78,6 +86,10 @@ export default function EditSessionPage() {
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
+
+  const [swimmers, setSwimmers] = useState<ApiSwimmer[]>([]);
+
+  const [selectedSwimmers, setSelectedSwimmers] = useState<number[]>([]);
 
   /* =========================
      LOAD SESSION
@@ -142,6 +154,13 @@ export default function EditSessionPage() {
                 },
               ],
         );
+
+        // Load existing swimmer assignments
+        const assignedSwimmerIds = (session.swimmers || []).map(
+          (swimmer) => swimmer.id,
+        );
+
+        setSelectedSwimmers(assignedSwimmerIds);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load session.",
@@ -155,6 +174,32 @@ export default function EditSessionPage() {
       loadSession();
     }
   }, [sessionId]);
+
+  /* =========================
+     LOAD SWIMMERS
+     ========================= */
+
+  useEffect(() => {
+    async function loadSwimmers() {
+      try {
+        const response = await fetch("/api/swimmers", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load swimmers.");
+        }
+
+        setSwimmers(data as ApiSwimmer[]);
+      } catch {
+        // Silently fail — swimmer list will be empty
+      }
+    }
+
+    loadSwimmers();
+  }, []);
 
   /* =========================
      SCHEDULE FUNCTIONS
@@ -195,6 +240,14 @@ export default function EditSessionPage() {
 
     setSchedules((current) =>
       current.filter((_, scheduleIndex) => scheduleIndex !== index),
+    );
+  }
+
+  function toggleSwimmer(swimmerId: number) {
+    setSelectedSwimmers((current) =>
+      current.includes(swimmerId)
+        ? current.filter((id) => id !== swimmerId)
+        : [...current, swimmerId],
     );
   }
 
@@ -274,12 +327,16 @@ export default function EditSessionPage() {
     try {
       setSaving(true);
 
+      const baseBody = {
+        name: className.trim(),
+
+        role: role === "head" ? "Head Coach" : "Assistant Coach",
+      };
+
       const requestBody =
         sessionType === "recurring"
           ? {
-              name: className.trim(),
-
-              role: role === "head" ? "Head Coach" : "Assistant Coach",
+              ...baseBody,
 
               session_type: "recurring",
 
@@ -290,11 +347,11 @@ export default function EditSessionPage() {
 
                 end_time: schedule.endTime,
               })),
+
+              swimmer_ids: selectedSwimmers,
             }
           : {
-              name: className.trim(),
-
-              role: role === "head" ? "Head Coach" : "Assistant Coach",
+              ...baseBody,
 
               session_type: "once",
 
@@ -303,6 +360,8 @@ export default function EditSessionPage() {
               start_time: onceStartTime,
 
               end_time: onceEndTime,
+
+              swimmer_ids: selectedSwimmers,
             };
 
       const response = await fetch(`/api/sessions/${sessionId}`, {
@@ -571,6 +630,40 @@ export default function EditSessionPage() {
             </div>
           )}
 
+          {/* Swimmers */}
+
+          <div style={sectionStyle}>
+            <h2
+              style={{
+                margin: 0,
+              }}
+            >
+              Assigned Swimmers
+            </h2>
+
+            <p style={subtitleStyle}>
+              Select swimmers only if they belong to this session.
+            </p>
+
+            {swimmers.length === 0 ? (
+              <p style={subtitleStyle}>No swimmers available.</p>
+            ) : (
+              <div style={swimmerListStyle}>
+                {swimmers.map((swimmer) => (
+                  <label key={swimmer.id} style={swimmerCheckboxStyle}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSwimmers.includes(swimmer.id)}
+                      onChange={() => toggleSwimmer(swimmer.id)}
+                    />
+
+                    {swimmer.name} — {swimmer.level}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Actions */}
 
           <div style={buttonRowStyle}>
@@ -688,6 +781,23 @@ const inputStyle = {
 const sectionStyle = {
   paddingTop: "20px",
   borderTop: "1px solid var(--border)",
+};
+
+const swimmerListStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "10px",
+  marginTop: "15px",
+};
+
+const swimmerCheckboxStyle = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+  padding: "12px",
+  backgroundColor: "var(--soft-background)",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
 };
 
 const scheduleRowStyle = {
