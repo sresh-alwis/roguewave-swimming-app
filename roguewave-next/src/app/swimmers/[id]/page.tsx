@@ -2,7 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+
+type ApiSession = {
+  id: number;
+  name: string;
+  role: string;
+  session_type: string;
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  session_schedules: {
+    id: number;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
+};
 
 type ApiSwimmer = {
   id: number;
@@ -14,6 +31,7 @@ type ApiSwimmer = {
   weight_kg: number | null;
   notes: string | null;
   created_at: string;
+  session: ApiSession | null;
 };
 
 type Swimmer = {
@@ -25,11 +43,13 @@ type Swimmer = {
   weight: string;
   dateJoined: string;
   sessionsCompleted: number;
+  assignedSession: string;
   extraDetails: string;
 };
 
 export default function SwimmerProfilePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
 
   const swimmerId = params.id;
 
@@ -84,6 +104,8 @@ export default function SwimmerProfilePage() {
           // Attendance is not connected yet.
           sessionsCompleted: 0,
 
+          assignedSession: apiSwimmer.session?.name || "",
+
           extraDetails: apiSwimmer.notes || "",
         });
       } catch (err) {
@@ -127,7 +149,7 @@ export default function SwimmerProfilePage() {
       }
 
       // Redirect to swimmers list on success
-      window.location.href = "/swimmers";
+      router.push("/swimmers");
     } catch (err) {
       alert(
         err instanceof Error ? err.message : "Failed to delete swimmer."
@@ -283,7 +305,11 @@ export default function SwimmerProfilePage() {
 
             <strong>Assigned Session</strong>
 
-            <p style={mutedTextStyle}>No session assigned.</p>
+            {swimmer.assignedSession ? (
+              <p style={notesStyle}>{swimmer.assignedSession}</p>
+            ) : (
+              <p style={mutedTextStyle}>No session assigned.</p>
+            )}
 
             <Link
               href={`/swimmers/${swimmer.id}/attendance-history`}

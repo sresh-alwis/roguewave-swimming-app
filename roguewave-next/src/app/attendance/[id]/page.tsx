@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 
 type Schedule = {
@@ -133,71 +133,109 @@ const initialSavedAttendance: AttendanceStore = {
   },
 };
 
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    () => {
+      return () => {};
+    },
+    () => true,
+    () => false,
+  );
+}
+
 export default function AttendanceSessionPage() {
   const params = useParams();
 
   const sessionId = Number(params.id);
 
+  const mounted = useMounted();
+
+  if (!mounted) {
+    return (
+      <main style={pageStyle}>
+        <section style={cardStyle}>
+          <p>Loading attendance...</p>
+        </section>
+      </main>
+    );
+  }
+
+  return <AttendanceContent key={sessionId} sessionId={sessionId} />;
+}
+
+function AttendanceContent({
+  sessionId,
+}: {
+  sessionId: number;
+}) {
   const session = sessions.find((session) => session.id === sessionId);
 
   const [records, setRecords] = useState<AttendanceStore>(
     initialSavedAttendance,
   );
 
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryDate = urlParams.get("date");
+    return queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+      ? queryDate
+      : getTodayKey();
+  });
 
   const [editing, setEditing] = useState(false);
 
-  const [presentSwimmers, setPresentSwimmers] = useState<number[]>([]);
-
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("normal");
-
-  const [coachStatus, setCoachStatus] = useState<CoachStatus>("present");
-
-  const [location, setLocation] = useState("");
-
-  useEffect(() => {
-    const targetSession = sessions.find((session) => session.id === sessionId);
-
-    if (!targetSession) return;
-
+  const [presentSwimmers, setPresentSwimmers] = useState<number[]>(() => {
     const urlParams = new URLSearchParams(window.location.search);
-
     const queryDate = urlParams.get("date");
-
     const initialDate =
       queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
         ? queryDate
         : getTodayKey();
-
-    setSelectedDate(initialDate);
-
-    setEditing(false);
-
     const key = `${sessionId}-${initialDate}`;
-
     const existing = initialSavedAttendance[key];
+    return existing?.kind === "swimmers" ? existing.swimmerIds : [];
+  });
 
-    if (existing?.kind === "swimmers") {
-      setPresentSwimmers(existing.swimmerIds);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryDate = urlParams.get("date");
+    const initialDate =
+      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+        ? queryDate
+        : getTodayKey();
+    const key = `${sessionId}-${initialDate}`;
+    const existing = initialSavedAttendance[key];
+    return (existing?.kind === "swimmers"
+      ? existing.sessionStatus
+      : "normal") as SessionStatus;
+  });
 
-      setSessionStatus(existing.sessionStatus);
+  const [coachStatus, setCoachStatus] = useState<CoachStatus>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryDate = urlParams.get("date");
+    const initialDate =
+      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+        ? queryDate
+        : getTodayKey();
+    const key = `${sessionId}-${initialDate}`;
+    const existing = initialSavedAttendance[key];
+    return (existing?.kind === "coach"
+      ? existing.coachStatus
+      : "present") as CoachStatus;
+  });
 
-      setLocation(existing.location);
-    } else if (existing?.kind === "coach") {
-      setCoachStatus(existing.coachStatus);
-
-      setLocation(existing.location);
-    } else {
-      setPresentSwimmers([]);
-
-      setSessionStatus("normal");
-
-      setCoachStatus("present");
-
-      setLocation(targetSession.defaultLocation);
-    }
-  }, [sessionId]);
+  const [location, setLocation] = useState<string>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryDate = urlParams.get("date");
+    const initialDate =
+      queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+        ? queryDate
+        : getTodayKey();
+    const key = `${sessionId}-${initialDate}`;
+    const existing = initialSavedAttendance[key];
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    return existing?.location || targetSession?.defaultLocation || "";
+  });
 
   if (!session) {
     return (

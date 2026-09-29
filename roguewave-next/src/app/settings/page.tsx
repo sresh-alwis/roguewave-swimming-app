@@ -1,9 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark" | "system";
+
+function useTheme(): Theme {
+  return useSyncExternalStore(
+    (callback) => {
+      window.addEventListener("storage", callback);
+      return () => window.removeEventListener("storage", callback);
+    },
+    () => {
+      const saved = localStorage.getItem("roguewave-theme") as Theme | null;
+      return saved || "system";
+    },
+    () => "system",
+  );
+}
 
 export default function SettingsPage() {
   const [coachName, setCoachName] = useState("Sreshta Alwis");
@@ -12,32 +26,7 @@ export default function SettingsPage() {
 
   const [email, setEmail] = useState("sreshta@example.com");
 
-  const [theme, setTheme] = useState<Theme>("system");
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("roguewave-theme") as Theme | null;
-
-    const initialTheme = savedTheme || "system";
-
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, []);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    function handleSystemThemeChange() {
-      if (theme === "system") {
-        applyTheme("system");
-      }
-    }
-
-    mediaQuery.addEventListener("change", handleSystemThemeChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleSystemThemeChange);
-    };
-  }, [theme]);
+  const theme = useTheme();
 
   function applyTheme(selectedTheme: Theme) {
     let actualTheme: "light" | "dark";
@@ -55,10 +44,30 @@ export default function SettingsPage() {
     document.documentElement.setAttribute("data-theme", actualTheme);
   }
 
-  function handleThemeChange(selectedTheme: Theme) {
-    setTheme(selectedTheme);
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    function handleSystemThemeChange() {
+      if (theme === "system") {
+        applyTheme("system");
+      }
+    }
+
+    mediaQuery.addEventListener("change", handleSystemThemeChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    };
+  }, [theme]);
+
+  function handleThemeChange(selectedTheme: Theme) {
     localStorage.setItem("roguewave-theme", selectedTheme);
+
+    window.dispatchEvent(new Event("storage"));
 
     applyTheme(selectedTheme);
   }

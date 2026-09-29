@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
 
 type Schedule = {
   dayOfWeek: number;
@@ -64,49 +65,50 @@ const sessions: Session[] = [
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    () => {
+      return () => {};
+    },
+    () => true,
+    () => false,
+  );
+}
+
 export default function HomePage() {
-  const [now, setNow] = useState<Date | null>(null);
+  const mounted = useMounted();
 
-  const [calendarMonth, setCalendarMonth] = useState<Date | null>(null);
+  const [monthOffset, setMonthOffset] = useState(0);
 
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  if (!mounted) {
+    return <main style={loadingStyle}>Loading RogueWave...</main>;
+  }
+
+  return <HomeContent monthOffset={monthOffset} setMonthOffset={setMonthOffset} />;
+}
+
+function HomeContent({
+  monthOffset,
+  setMonthOffset,
+}: {
+  monthOffset: number;
+  setMonthOffset: React.Dispatch<React.SetStateAction<number>>;
+}) {
+  const [now, setNow] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    const current = new Date();
-
-    setNow(current);
-
-    setCalendarMonth(new Date(current.getFullYear(), current.getMonth(), 1));
-
-    setSelectedDate(current);
-
     const timer = setInterval(() => {
       setNow(new Date());
     }, 60000);
-
     return () => clearInterval(timer);
   }, []);
 
-  function getSessionsForDate(date: Date) {
-    const day = date.getDay();
-
-    return sessions
-      .flatMap((session) =>
-        session.schedules
-          .filter((schedule) => schedule.dayOfWeek === day)
-          .map((schedule) => ({
-            ...session,
-            startTime: schedule.startTime,
-            endTime: schedule.endTime,
-            date,
-          })),
-      )
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }
+  const calendarMonth = useMemo(() => {
+    return new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  }, [now, monthOffset]);
 
   const nextSession = useMemo(() => {
-    if (!now) return null;
-
     const possibleSessions = [];
 
     for (let i = 0; i < 30; i++) {
@@ -142,8 +144,21 @@ export default function HomePage() {
     return possibleSessions[0] || null;
   }, [now]);
 
-  if (!now || !calendarMonth) {
-    return <main style={loadingStyle}>Loading RogueWave...</main>;
+  function getSessionsForDate(date: Date) {
+    const day = date.getDay();
+
+    return sessions
+      .flatMap((session) =>
+        session.schedules
+          .filter((schedule) => schedule.dayOfWeek === day)
+          .map((schedule) => ({
+            ...session,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            date,
+          })),
+      )
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   const selectedDaySessions = selectedDate
@@ -171,17 +186,17 @@ export default function HomePage() {
   }
 
   function previousMonth() {
-    setCalendarMonth(new Date(year, month - 1, 1));
+    setMonthOffset((prev) => prev - 1);
   }
 
   function nextMonth() {
-    setCalendarMonth(new Date(year, month + 1, 1));
+    setMonthOffset((prev) => prev + 1);
   }
 
   function goToToday() {
     if (!now) return;
 
-    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setMonthOffset(0);
 
     setSelectedDate(now);
   }
@@ -527,6 +542,15 @@ function formatDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+const loadingStyle = {
+  minHeight: "100vh",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "var(--background)",
+  color: "var(--text)",
+};
+
 function formatTime(time: string) {
   const [hourText, minute] = time.split(":");
 
@@ -538,15 +562,6 @@ function formatTime(time: string) {
 
   return `${displayHour}:${minute} ${period}`;
 }
-
-const loadingStyle = {
-  minHeight: "100vh",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "var(--background)",
-  color: "var(--text)",
-};
 
 const pageStyle = {
   minHeight: "100vh",

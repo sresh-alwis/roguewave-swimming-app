@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type SessionType = "recurring" | "once" | "";
@@ -43,6 +43,14 @@ const prototypeSwimmers = [
 ];
 
 export default function AddSessionPage() {
+  return (
+    <Suspense>
+      <AddSessionForm />
+    </Suspense>
+  );
+}
+
+function AddSessionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
