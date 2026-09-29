@@ -9,12 +9,18 @@ type Schedule = {
   endTime: string;
 };
 
+type Swimmer = {
+  id: number;
+  name: string;
+  level: string;
+};
+
 type Session = {
   id: number;
   name: string;
   role: "Head Coach" | "Assistant Coach";
   type: "Recurring" | "Once";
-  swimmers: number;
+  swimmers: Swimmer[];
   schedules: Schedule[];
   date?: string;
   startTime?: string;
@@ -40,6 +46,10 @@ type ApiSession = {
   end_time: string | null;
 
   session_schedules: ApiSchedule[];
+
+  session_swimmers: {
+    swimmers: Swimmer | null;
+  }[];
 };
 
 export default function SessionsPage() {
@@ -75,8 +85,9 @@ export default function SessionsPage() {
                 ? "Once"
                 : "Recurring",
 
-            // Swimmer relationship is not connected yet.
-            swimmers: 0,
+            swimmers: (session.session_swimmers || [])
+              .map((item) => item.swimmers)
+              .filter((swimmer): swimmer is Swimmer => swimmer !== null),
 
             date: session.session_date
               ? formatDate(session.session_date)
@@ -315,10 +326,20 @@ export default function SessionsPage() {
                       marginTop: "18px",
                     }}
                   >
-                    {session.swimmers > 0 ? (
-                      <span style={swimmerInfoStyle}>
-                        {session.swimmers} swimmers assigned
-                      </span>
+                    {session.swimmers.length > 0 ? (
+                      <>
+                        <span style={swimmerInfoStyle}>
+                          {session.swimmers.length}{" "}
+                          {session.swimmers.length === 1
+                            ? "swimmer"
+                            : "swimmers"}{" "}
+                          assigned
+                        </span>
+
+                        <div style={swimmerNamesStyle}>
+                          {session.swimmers.map((swimmer) => swimmer.name).join(", ")}
+                        </div>
+                      </>
                     ) : (
                       <span style={mutedTextStyle}>No swimmers assigned</span>
                     )}
@@ -545,6 +566,12 @@ const dayStyle = {
 const swimmerInfoStyle = {
   color: "var(--accent-text)",
   fontWeight: "bold",
+};
+
+const swimmerNamesStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "13px",
+  marginTop: "4px",
 };
 
 const mutedTextStyle = {
