@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 
 type Schedule = {
@@ -53,36 +53,19 @@ type CoachStatus =
   | "no-session"
   | "holiday";
 
-type SwimmerAttendanceRecord = {
-  kind: "swimmers";
-  swimmerIds: number[];
-  sessionStatus: SessionStatus;
-  location: string;
-};
-
-type CoachAttendanceRecord = {
-  kind: "coach";
-  coachStatus: CoachStatus;
-  location: string;
-};
-
-type AttendanceRecord = SwimmerAttendanceRecord | CoachAttendanceRecord;
-
-type AttendanceStore = Record<string, AttendanceRecord>;
-
-const initialSavedAttendance: AttendanceStore = {
-  "1-2026-09-24": {
-    kind: "swimmers",
-    swimmerIds: [1, 2, 4],
-    sessionStatus: "normal",
-    location: "President's College Pool",
-  },
-
-  "2-2026-09-23": {
-    kind: "coach",
-    coachStatus: "present",
-    location: "Swimming Pool",
-  },
+type ApiAttendanceRecord = {
+  id: number;
+  session_id: number;
+  attendance_date: string;
+  location: string | null;
+  session_status: string;
+  coach_status: string | null;
+  swimmers: {
+    id: number;
+    swimmer_id: number | null;
+    swimmer_name: string;
+    attendance_status: string;
+  }[];
 };
 
 function useMounted(): boolean {
@@ -124,10 +107,6 @@ function AttendanceContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [records, setRecords] = useState<AttendanceStore>(
-    initialSavedAttendance,
-  );
-
   const [selectedDate, setSelectedDate] = useState("");
 
   const [editing, setEditing] = useState(false);
@@ -140,6 +119,13 @@ function AttendanceContent({
   const [coachStatus, setCoachStatus] = useState<CoachStatus>("present");
 
   const [location, setLocation] = useState("");
+
+  const [attendanceRecord, setAttendanceRecord] =
+    useState<ApiAttendanceRecord | null>(null);
+
+  const [saving, setSaving] = useState(false);
+
+  const attendanceRequestKey = useRef<string | null>(null);
 
   useEffect(() => {
     async function loadSession() {
@@ -182,23 +168,6 @@ function AttendanceContent({
             : getTodayKey();
 
         setSelectedDate(initialDate);
-
-        const key = `${sessionId}-${initialDate}`;
-        const existing = initialSavedAttendance[key];
-
-        if (existing?.kind === "swimmers") {
-          setPresentSwimmers(existing.swimmerIds);
-          setSessionStatus(existing.sessionStatus);
-          setLocation(existing.location);
-        } else if (existing?.kind === "coach") {
-          setCoachStatus(existing.coachStatus);
-          setLocation(existing.location);
-        } else {
-          setPresentSwimmers([]);
-          setSessionStatus("normal");
-          setCoachStatus("present");
-          setLocation(loadedSession.defaultLocation);
-        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load session.",
@@ -210,6 +179,71 @@ function AttendanceContent({
 
     loadSession();
   }, [sessionId]);
+
+  const loadAttendance = useCallback(
+    async (
+      attendanceSessionId: number,
+      date: string,
+      defaultLocation: string,
+    ) => {
+      const requestKey = `${attendanceSessionId}-${date}`;
+
+      if (attendanceRequestKey.current === requestKey) {
+        return;
+      }
+
+      attendanceRequestKey.current = requestKey;
+
+      try {
+        const response = await fetch(
+          `/api/attendance?session_id=${attendanceSessionId}&date=${date}`,
+          { cache: "no-store" },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setAttendanceRecord(null);
+          return;
+        }
+
+        const record = data.record as ApiAttendanceRecord | null;
+
+        setAttendanceRecord(record);
+
+        if (record) {
+          setLocation(record.location ?? defaultLocation);
+          setSessionStatus(record.session_status as SessionStatus);
+          setCoachStatus((record.coach_status ?? "present") as CoachStatus);
+          setPresentSwimmers(
+            record.swimmers
+              .filter((swimmer) => swimmer.attendance_status === "present")
+              .map((swimmer) => swimmer.swimmer_id)
+              .filter((id): id is number => id !== null),
+          );
+        } else {
+          setLocation(defaultLocation);
+          setSessionStatus("normal");
+          setCoachStatus("present");
+          setPresentSwimmers([]);
+        }
+      } catch {
+        setAttendanceRecord(null);
+      } finally {
+        attendanceRequestKey.current = null;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (session && selectedDate) {
+      // Data-fetching effect: setState happens after the first await inside
+      // loadAttendance, not synchronously in the effect body.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadAttendance(sessionId, selectedDate, session.defaultLocation);
+    }
+  }, [session, selectedDate, sessionId, loadAttendance]);
 
   if (loading) {
     return (
@@ -243,9 +277,7 @@ function AttendanceContent({
 
   const hasSwimmers = isHeadCoach && currentSession.swimmers.length > 0;
 
-  const savedKey = `${sessionId}-${selectedDate}`;
-
-  const existingRecord = selectedDate ? records[savedKey] : undefined;
+  const existingRecord = selectedDate ? attendanceRecord : null;
 
   const selectedSchedule = selectedDate
     ? getScheduleForDate(currentSession, selectedDate)
@@ -257,29 +289,15 @@ function AttendanceContent({
     setSelectedDate(date);
     setEditing(false);
 
-    const key = `${sessionId}-${date}`;
+    setAttendanceRecord(null);
 
-    const existing = records[key];
+    setPresentSwimmers([]);
 
-    if (existing?.kind === "swimmers") {
-      setPresentSwimmers(existing.swimmerIds);
+    setSessionStatus("normal");
 
-      setSessionStatus(existing.sessionStatus);
+    setCoachStatus("present");
 
-      setLocation(existing.location);
-    } else if (existing?.kind === "coach") {
-      setCoachStatus(existing.coachStatus);
-
-      setLocation(existing.location);
-    } else {
-      setPresentSwimmers([]);
-
-      setSessionStatus("normal");
-
-      setCoachStatus("present");
-
-      setLocation(currentSession.defaultLocation);
-    }
+    setLocation(currentSession.defaultLocation);
   }
 
   function toggleSwimmer(swimmerId: number) {
@@ -294,7 +312,7 @@ function AttendanceContent({
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!selectedDate) {
       alert("Please select a date.");
       return;
@@ -313,52 +331,158 @@ function AttendanceContent({
     const attendanceLocation =
       location.trim() || currentSession.defaultLocation;
 
-    let newRecord: AttendanceRecord;
+    setSaving(true);
 
-    if (hasSwimmers) {
-      newRecord = {
-        kind: "swimmers",
-
-        swimmerIds: sessionStatus === "normal" ? presentSwimmers : [],
-
-        sessionStatus,
-
+    if (existingRecord) {
+      // Update existing attendance via the real API.
+      const body: {
+        location: string;
+        session_status?: string;
+        coach_status?: string;
+        present_swimmer_ids?: number[];
+      } = {
         location: attendanceLocation,
       };
-    } else {
-      newRecord = {
-        kind: "coach",
 
-        coachStatus,
+      if (isHeadCoach) {
+        body.session_status = sessionStatus;
 
-        location: attendanceLocation,
-      };
-    }
+        const wasNormal = existingRecord.session_status === "normal";
+        const originalPresentIds = existingRecord.swimmers
+          .filter((swimmer) => swimmer.attendance_status === "present")
+          .map((swimmer) => swimmer.swimmer_id)
+          .filter((id): id is number => id !== null);
 
-    setRecords((current) => ({
-      ...current,
-      [savedKey]: newRecord,
-    }));
+        const selectionChanged =
+          presentSwimmers.length !== originalPresentIds.length ||
+          !presentSwimmers.every((id) => originalPresentIds.includes(id));
 
-    alert(existingRecord ? "Attendance updated." : "Attendance saved.");
+        if (sessionStatus === "normal" && (!wasNormal || selectionChanged)) {
+          body.present_swimmer_ids = presentSwimmers;
+        }
+      } else {
+        body.coach_status = coachStatus;
+      }
 
-    setEditing(false);
-  }
+      try {
+        const response = await fetch(
+          `/api/attendance/${existingRecord.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
 
-  function cancelEdit() {
-    if (!existingRecord) {
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.error || "Failed to update attendance.");
+          return;
+        }
+
+        const record = data.record as ApiAttendanceRecord;
+
+        setAttendanceRecord(record);
+
+        setLocation(record.location ?? currentSession.defaultLocation);
+        setSessionStatus(record.session_status as SessionStatus);
+        setCoachStatus((record.coach_status ?? "present") as CoachStatus);
+        setPresentSwimmers(
+          record.swimmers
+            .filter((swimmer) => swimmer.attendance_status === "present")
+            .map((swimmer) => swimmer.swimmer_id)
+            .filter((id): id is number => id !== null),
+        );
+
+        alert("Attendance updated.");
+
+        setEditing(false);
+      } catch {
+        alert("Failed to update attendance.");
+      } finally {
+        setSaving(false);
+      }
+
       return;
     }
 
-    if (existingRecord.kind === "swimmers") {
-      setPresentSwimmers(existingRecord.swimmerIds);
+    // Create new attendance via the real API.
+    const body: {
+      session_id: number;
+      attendance_date: string;
+      location: string;
+      session_status: string;
+      coach_status: string | null;
+      present_swimmer_ids?: number[];
+    } = {
+      session_id: sessionId,
+      attendance_date: selectedDate,
+      location: attendanceLocation,
+      session_status: sessionStatus,
+      coach_status: isHeadCoach ? null : coachStatus,
+    };
 
-      setSessionStatus(existingRecord.sessionStatus);
-    } else {
-      setCoachStatus(existingRecord.coachStatus);
+    if (isHeadCoach) {
+      body.present_swimmer_ids =
+        sessionStatus === "normal" ? presentSwimmers : [];
     }
 
-    setLocation(existingRecord.location);
+    try {
+      const response = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to save attendance.");
+        return;
+      }
+
+      const record = data.record as ApiAttendanceRecord;
+
+      setAttendanceRecord(record);
+
+      setLocation(record.location ?? currentSession.defaultLocation);
+      setSessionStatus(record.session_status as SessionStatus);
+      setCoachStatus((record.coach_status ?? "present") as CoachStatus);
+      setPresentSwimmers(
+        record.swimmers
+          .filter((swimmer) => swimmer.attendance_status === "present")
+          .map((swimmer) => swimmer.swimmer_id)
+          .filter((id): id is number => id !== null),
+      );
+
+      alert("Attendance saved.");
+
+      setEditing(false);
+    } catch {
+      alert("Failed to save attendance.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function cancelEdit() {
+    if (!attendanceRecord) {
+      return;
+    }
+
+    setPresentSwimmers(
+      attendanceRecord.swimmers
+        .filter((swimmer) => swimmer.attendance_status === "present")
+        .map((swimmer) => swimmer.swimmer_id)
+        .filter((id): id is number => id !== null),
+    );
+
+    setSessionStatus(attendanceRecord.session_status as SessionStatus);
+
+    setCoachStatus((attendanceRecord.coach_status ?? "present") as CoachStatus);
+
+    setLocation(attendanceRecord.location ?? currentSession.defaultLocation);
 
     setEditing(false);
   }
@@ -597,8 +721,13 @@ function AttendanceContent({
                       type="button"
                       style={buttonStyle}
                       onClick={handleSave}
+                      disabled={saving}
                     >
-                      {existingRecord ? "Update Attendance" : "Save Attendance"}
+                      {saving
+                        ? "Saving..."
+                        : existingRecord
+                          ? "Update Attendance"
+                          : "Save Attendance"}
                     </button>
                   )}
 
