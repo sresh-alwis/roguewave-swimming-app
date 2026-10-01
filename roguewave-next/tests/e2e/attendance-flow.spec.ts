@@ -287,9 +287,18 @@ test.describe("Attendance UI Flow", () => {
   test("H: Frontend validation - future date", async ({ page }) => {
     await setupAttendanceRoute(page, "2020-01-01", null);
 
+    // Find a future Wednesday (day_of_week: 3) to match the mocked session's schedule.
+    // The mocked session is only scheduled on Wednesday, so the future date must also
+    // be a Wednesday for the Save Attendance button to be rendered.
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 7);
-    const futureDateStr = futureDate.toISOString().split("T")[0];
+    while (futureDate.getDay() !== 3) {
+      futureDate.setDate(futureDate.getDate() + 1);
+    }
+    const year = futureDate.getFullYear();
+    const month = String(futureDate.getMonth() + 1).padStart(2, "0");
+    const day = String(futureDate.getDate()).padStart(2, "0");
+    const futureDateStr = `${year}-${month}-${day}`;
     await setupAttendanceRoute(page, futureDateStr, null);
 
     await page.goto(`/attendance/${SESSION_ID}?date=2020-01-01`);
