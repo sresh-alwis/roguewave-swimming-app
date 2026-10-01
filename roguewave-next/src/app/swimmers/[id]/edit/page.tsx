@@ -17,21 +17,10 @@ type ApiSwimmer = {
   height_cm: number | null;
   weight_kg: number | null;
   notes: string | null;
-  session: {
+  sessions: {
     id: number;
     name: string;
-  } | null;
-};
-
-type ApiSession = {
-  id: number;
-  name: string;
-  role: string;
-  session_type: string;
-  default_location: string | null;
-  session_date: string | null;
-  start_time: string | null;
-  end_time: string | null;
+  }[];
 };
 
 export default function EditSwimmerPage() {
@@ -65,39 +54,9 @@ export default function EditSwimmerPage() {
 
   const [error, setError] = useState("");
 
-  const [sessions, setSessions] = useState<ApiSession[]>([]);
-
-  const [assignedSession, setAssignedSession] = useState("");
-
-  /* =========================
-     LOAD SESSIONS
-  ========================= */
-
-  useEffect(() => {
-    async function loadSessions() {
-      try {
-        const response = await fetch("/api/sessions", {
-          cache: "no-store",
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to load sessions.");
-        }
-
-        setSessions(data as ApiSession[]);
-      } catch {
-        // Silently fail — dropdown will just be empty
-      }
-    }
-
-    loadSessions();
-  }, []);
-
   /* =========================
      LOAD SWIMMER
-  ========================= */
+     ========================= */
 
   useEffect(() => {
     async function loadSwimmer() {
@@ -139,10 +98,6 @@ export default function EditSwimmerPage() {
         }
 
         setExtraDetails(swimmer.notes || "");
-
-        if (swimmer.session) {
-          setAssignedSession(swimmer.session.id.toString());
-        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load swimmer.",
@@ -159,7 +114,7 @@ export default function EditSwimmerPage() {
 
   /* =========================
      UPDATE SWIMMER
-  ========================= */
+     ========================= */
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -231,8 +186,6 @@ export default function EditSwimmerPage() {
           weight_kg: swimmerWeight,
 
           notes: extraDetails.trim() || null,
-
-          session_id: assignedSession ? Number(assignedSession) : null,
         }),
       });
 
@@ -254,7 +207,7 @@ export default function EditSwimmerPage() {
 
   /* =========================
      LOADING
-  ========================= */
+     ========================= */
 
   if (loading) {
     return (
@@ -268,7 +221,7 @@ export default function EditSwimmerPage() {
 
   /* =========================
      ERROR
-  ========================= */
+     ========================= */
 
   if (error) {
     return (
@@ -419,23 +372,6 @@ export default function EditSwimmerPage() {
           <div style={sectionStyle}>
             <h2 style={sectionTitleStyle}>Training Details</h2>
 
-            <label>
-              Assigned Session
-              <select
-                value={assignedSession}
-                onChange={(e) => setAssignedSession(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="">No Session Assigned</option>
-
-                {sessions.map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {session.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <label style={detailsLabelStyle}>
               Extra Details <span style={optionalStyle}>(Optional)</span>
               <textarea
@@ -482,7 +418,7 @@ export default function EditSwimmerPage() {
 
 /* =========================
    HELPERS
-========================= */
+   ========================= */
 
 function convertCmToFeetInches(heightCm: number) {
   const totalInches = heightCm / 2.54;
@@ -504,7 +440,7 @@ function convertCmToFeetInches(heightCm: number) {
 
 /* =========================
    STYLES
-========================= */
+   ========================= */
 
 const pageStyle = {
   minHeight: "100vh",

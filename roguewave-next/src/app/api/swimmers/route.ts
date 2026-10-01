@@ -45,7 +45,6 @@ export async function POST(request: Request) {
       height_cm,
       weight_kg,
       notes,
-      session_id,
     } = body;
 
     /* -------------------------
@@ -166,54 +165,6 @@ export async function POST(request: Request) {
           status: 500,
         },
       );
-    }
-
-    /* =========================
-       CREATE SESSION RELATIONSHIP
-    ========================= */
-
-    /*
-       If session_id is provided, create a session-swimmer relationship.
-       Note: session_id can be null, in which case we don't create a relationship.
-    */
-
-    if (session_id !== undefined && session_id !== null) {
-      const sessionId = Number(session_id);
-
-      if (!Number.isNaN(sessionId)) {
-        const { error: relationshipError } = await supabaseServer
-          .from("session_swimmers")
-          .insert({
-            session_id: sessionId,
-            swimmer_id: swimmer.id,
-          });
-
-        if (relationshipError) {
-          // Clean up the newly-created swimmer since relationship creation failed
-          await supabaseServer.from("swimmers").delete().eq("id", swimmer.id);
-
-          return NextResponse.json(
-            {
-              error: relationshipError.message,
-            },
-            {
-              status: 500,
-            },
-          );
-        }
-      } else {
-        // Clean up the newly-created swimmer since session_id is invalid
-        await supabaseServer.from("swimmers").delete().eq("id", swimmer.id);
-
-        return NextResponse.json(
-          {
-            error: "Invalid session ID provided.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
     }
 
     return NextResponse.json(

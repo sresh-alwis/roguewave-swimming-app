@@ -23,6 +23,25 @@ type Filter = {
   negate?: boolean;
 };
 
+type NestedSelect = {
+  table: string;
+  nestedTable?: string;
+};
+
+function parseNestedSelect(selectArg: string): NestedSelect | null {
+  if (!selectArg || typeof selectArg !== "string") return null;
+  const match = selectArg.match(/^(\w+)\s*\(/);
+  if (!match) return null;
+  const table = match[1];
+  const allMatches = selectArg.match(/(\w+)\s*\(/g);
+  let nestedTable: string | undefined;
+  if (allMatches && allMatches.length > 1) {
+    const second = allMatches[1].match(/(\w+)\s*\(/);
+    if (second) nestedTable = second[1];
+  }
+  return { table, nestedTable };
+}
+
 export function createSessionsQueryBuilder(
   table: string,
   state: MockSessionsState,
@@ -33,6 +52,7 @@ export function createSessionsQueryBuilder(
   let isDelete = false;
   let isSelect = false;
   let isSingle = false;
+  let nestedSelect: NestedSelect | null = null;
 
   function getTableData(): Record<string, any>[] {
     return state[table as keyof MockSessionsState] as Record<string, any>[];
@@ -74,9 +94,27 @@ export function createSessionsQueryBuilder(
     };
   }
 
+  function hydrateSwimmer(row: Record<string, any>): Record<string, any> {
+    const sessions = state.session_swimmers
+      .filter((ss) => ss.swimmer_id === row.id)
+      .map((ss) => {
+        const session = state.sessions.find((s) => s.id === ss.session_id);
+        if (!session) return null;
+        const schedules = state.session_schedules.filter(
+          (s) => s.session_id === session.id,
+        );
+        return { ...session, session_schedules: schedules };
+      })
+      .filter((s) => s !== null);
+    return { ...row, sessions };
+  }
+
   const builder = {
-    select() {
+    select(arg?: string) {
       isSelect = true;
+      if (arg) {
+        nestedSelect = parseNestedSelect(arg);
+      }
       return builder;
     },
     insert(data: any) {
@@ -146,6 +184,16 @@ export function createSessionsQueryBuilder(
       results.forEach((row) => {
         Object.assign(row, pendingUpdate);
       });
+      if (isSelect) {
+        const row = results[0] ?? null;
+        if (row) {
+          if (table === "swimmers") {
+            return { data: hydrateSwimmer(row), error: null };
+          }
+          return { data: row, error: null };
+        }
+        return { data: null, error: null };
+      }
       return { data: null, error: null };
     }
 
@@ -160,11 +208,50 @@ export function createSessionsQueryBuilder(
 
     // Handle select
     if (isSelect) {
+      // Handle nested select (e.g., session_swimmers → sessions → session_schedules)
+      if (nestedSelect) {
+        const { table, nestedTable } = nestedSelect;
+        const singularTable = table.replace(/s$/, "");
+        const fkColumn = [`${singularTable}_id`, `${table}_id`].find(
+          (col) => col in results[0],
+        );
+
+        const hydrated = results.map((row) => {
+          if (!fkColumn) return { ...row, [table]: null };
+
+          const fkValue = row[fkColumn];
+          const nestedRows = (state[table as keyof MockSessionsState] as Record<string, any>[]) || [];
+          const nestedRow = nestedRows.find((r) => r.id === fkValue);
+
+          if (!nestedRow) return { ...row, [table]: null };
+
+          let hydratedNested = { ...nestedRow };
+
+          if (nestedTable) {
+            const childRows = (state[nestedTable as keyof MockSessionsState] as Record<string, any>[]) || [];
+            const children = childRows.filter(
+              (child) => child[`${singularTable}_id`] === nestedRow.id,
+            );
+            hydratedNested = { ...hydratedNested, [nestedTable]: children };
+          }
+
+          return { ...row, [table]: hydratedNested };
+        });
+
+        if (isSingle) {
+          return { data: hydrated[0] ?? null, error: null };
+        }
+        return { data: hydrated, error: null };
+      }
+
       if (isSingle) {
         const row = results[0] ?? null;
         if (row) {
           if (table === "sessions") {
             return { data: hydrateSession(row), error: null };
+          }
+          if (table === "swimmers") {
+            return { data: hydrateSwimmer(row), error: null };
           }
           return { data: row, error: null };
         }

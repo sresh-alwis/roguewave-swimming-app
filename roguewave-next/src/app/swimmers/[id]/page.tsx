@@ -31,7 +31,7 @@ type ApiSwimmer = {
   weight_kg: number | null;
   notes: string | null;
   created_at: string;
-  session: ApiSession | null;
+  sessions: ApiSession[];
 };
 
 type Swimmer = {
@@ -43,7 +43,7 @@ type Swimmer = {
   weight: string;
   dateJoined: string;
   sessionsCompleted: number;
-  assignedSession: string;
+  assignedSessions: ApiSession[];
   extraDetails: string;
 };
 
@@ -104,7 +104,7 @@ export default function SwimmerProfilePage() {
           // Attendance is not connected yet.
           sessionsCompleted: 0,
 
-          assignedSession: apiSwimmer.session?.name || "",
+          assignedSessions: apiSwimmer.sessions || [],
 
           extraDetails: apiSwimmer.notes || "",
         });
@@ -303,12 +303,28 @@ export default function SwimmerProfilePage() {
 
             <div style={dividerStyle} />
 
-            <strong>Assigned Session</strong>
+            <strong>Assigned Sessions</strong>
 
-            {swimmer.assignedSession ? (
-              <p style={notesStyle}>{swimmer.assignedSession}</p>
+            {swimmer.assignedSessions.length > 0 ? (
+              <div style={assignedSessionsListStyle}>
+                {swimmer.assignedSessions.map((session) => (
+                  <div key={session.id} style={assignedSessionItemStyle}>
+                    <div style={assignedSessionNameStyle}>{session.name}</div>
+                    <div style={assignedSessionDetailStyle}>
+                      {session.session_type === "once"
+                        ? `Once • ${formatDate(session.session_date || "")} • ${formatTime(session.start_time || "")} - ${formatTime(session.end_time || "")}`
+                        : `Recurring • ${session.session_schedules.map((s) => `${getDayName(s.day_of_week)} ${formatTime(s.start_time)} - ${formatTime(s.end_time)}`).join(", ")}`}
+                    </div>
+                    {session.default_location && (
+                      <div style={assignedSessionLocationStyle}>
+                        • {session.default_location}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p style={mutedTextStyle}>No session assigned.</p>
+              <p style={mutedTextStyle}>No sessions assigned.</p>
             )}
 
             <Link
@@ -374,6 +390,27 @@ function formatDate(date: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatTime(time: string) {
+  const [hourText, minute] = time.split(":");
+  const hour = Number(hourText);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minute} ${period}`;
+}
+
+function getDayName(dayOfWeek: number) {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  return days[dayOfWeek] ?? "Unknown";
 }
 
 function formatHeight(heightCm: number) {
@@ -569,13 +606,43 @@ const notFoundStyle = {
   borderRadius: "10px",
 };
 
-  const deleteButtonStyle = {
-    backgroundColor: "var(--danger)",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    padding: "10px 18px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "14px",
-  };
+const deleteButtonStyle = {
+  backgroundColor: "var(--danger)",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  padding: "10px 18px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
+const assignedSessionsListStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "12px",
+  marginTop: "8px",
+};
+
+const assignedSessionItemStyle = {
+  padding: "12px",
+  backgroundColor: "var(--soft-background)",
+  borderRadius: "6px",
+  border: "1px solid var(--border)",
+};
+
+const assignedSessionNameStyle = {
+  fontWeight: "bold",
+  marginBottom: "4px",
+};
+
+const assignedSessionDetailStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "13px",
+};
+
+const assignedSessionLocationStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "13px",
+  marginTop: "2px",
+};

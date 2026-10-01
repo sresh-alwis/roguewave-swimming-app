@@ -298,6 +298,10 @@ export async function PATCH(
        If swimmer_ids is supplied, handle session-swimmer assignments.
        First remove all existing relationships for this session.
        Then create the new ones.
+
+       Many-to-many: swimmers can belong to multiple sessions.
+       We only modify assignments for THIS session and do NOT touch
+       assignments in other sessions.
     */
 
     if (swimmer_ids !== undefined) {
@@ -342,53 +346,13 @@ export async function PATCH(
         );
       }
 
-      // Preserve assignments in OTHER sessions before removing them (for rollback on failure)
-      const { data: otherSessionAssignments, error: fetchOtherError } = await supabaseServer
-        .from("session_swimmers")
-        .select("session_id, swimmer_id")
-        .in("swimmer_id", uniqueSwimmerIds)
-        .neq("session_id", sessionId);
-
-      if (fetchOtherError) {
-        return NextResponse.json(
-          {
-            error: fetchOtherError.message,
-          },
-          { status: 500 },
-        );
-      }
-
-      // V1: Enforce one-session-per-swimmer.
-      // Remove any existing assignments for these swimmers in OTHER sessions.
-      if (uniqueSwimmerIds.length > 0) {
-        const { error: deleteOtherError } = await supabaseServer
-          .from("session_swimmers")
-          .delete()
-          .in("swimmer_id", uniqueSwimmerIds)
-          .neq("session_id", sessionId);
-
-        if (deleteOtherError) {
-          return NextResponse.json(
-            {
-              error: deleteOtherError.message,
-            },
-            { status: 500 },
-          );
-        }
-      }
-
-      // Remove all existing relationships for this session
+      // Remove all existing relationships for THIS session only
       const { error: deleteError } = await supabaseServer
         .from("session_swimmers")
         .delete()
         .eq("session_id", sessionId);
 
       if (deleteError) {
-        // Restore other-session assignments on failure
-        if (otherSessionAssignments && otherSessionAssignments.length > 0) {
-          await supabaseServer.from("session_swimmers").insert(otherSessionAssignments);
-        }
-
         return NextResponse.json(
           {
             error: deleteError.message,
@@ -416,11 +380,6 @@ export async function PATCH(
               swimmer_id: r.swimmer_id,
             }));
             await supabaseServer.from("session_swimmers").insert(restoreRows);
-          }
-
-          // Restore other-session assignments on failure
-          if (otherSessionAssignments && otherSessionAssignments.length > 0) {
-            await supabaseServer.from("session_swimmers").insert(otherSessionAssignments);
           }
 
           return NextResponse.json(
