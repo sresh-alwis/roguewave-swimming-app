@@ -4,7 +4,14 @@ export type MockSessionsState = {
   session_schedules: Record<string, any>[];
   session_swimmers: Record<string, any>[];
   swimmers: Record<string, any>[];
+  attendance_swimmers: Record<string, any>[];
+  attendance_records: Record<string, any>[];
   nextId: number;
+  fkBehavior?: {
+    session_swimmers?: "CASCADE" | "SET NULL" | "RESTRICT";
+    attendance_swimmers?: "CASCADE" | "SET NULL" | "RESTRICT";
+  };
+  simulateError?: boolean;
 };
 
 export function createMockSessionsState(): MockSessionsState {
@@ -13,7 +20,13 @@ export function createMockSessionsState(): MockSessionsState {
     session_schedules: [],
     session_swimmers: [],
     swimmers: [],
+    attendance_swimmers: [],
+    attendance_records: [],
     nextId: 1000,
+    fkBehavior: {
+      session_swimmers: "CASCADE",
+      attendance_swimmers: "SET NULL",
+    },
   };
 }
 
@@ -199,6 +212,33 @@ export function createSessionsQueryBuilder(
 
     // Handle delete
     if (isDelete) {
+      // Simulate database error for testing error handling
+      if (state.simulateError) {
+        return { data: null, error: { message: "Database connection failed" } };
+      }
+
+      // Simulate FK behaviour when deleting swimmers
+      if (table === "swimmers" && state.fkBehavior) {
+        const deletedIds = results.map((r) => r.id);
+
+        // CASCADE: remove session_swimmers rows for deleted swimmers
+        if (state.fkBehavior.session_swimmers === "CASCADE") {
+          state.session_swimmers = state.session_swimmers.filter(
+            (ss) => !deletedIds.includes(ss.swimmer_id),
+          );
+        }
+
+        // SET NULL: set swimmer_id to null in attendance_swimmers rows
+        if (state.fkBehavior.attendance_swimmers === "SET NULL") {
+          state.attendance_swimmers = state.attendance_swimmers.map((as) => {
+            if (deletedIds.includes(as.swimmer_id)) {
+              return { ...as, swimmer_id: null };
+            }
+            return as;
+          });
+        }
+      }
+
       results.forEach((row) => {
         const index = tableData.indexOf(row);
         if (index > -1) tableData.splice(index, 1);

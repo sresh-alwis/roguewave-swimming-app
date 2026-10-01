@@ -130,7 +130,7 @@ export default function SwimmerProfilePage() {
     if (!swimmer) return;
 
     const confirmed = window.confirm(
-      `Delete ${swimmer.name}? This action cannot be undone.`
+      `Delete ${swimmer.name}? This will remove them from all current sessions. Their previous attendance history will be kept. This action cannot be undone.`
     );
 
     if (!confirmed) return;
