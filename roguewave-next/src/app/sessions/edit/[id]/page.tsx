@@ -69,6 +69,8 @@ export default function EditSessionPage() {
 
   const [className, setClassName] = useState("");
 
+  const [defaultLocation, setDefaultLocation] = useState("");
+
   const [sessionType, setSessionType] = useState<SessionType>("");
 
   const [role, setRole] = useState<Role>("");
@@ -111,6 +113,8 @@ export default function EditSessionPage() {
         const session = data as ApiSession;
 
         setClassName(session.name);
+
+        setDefaultLocation(session.default_location || "");
 
         const type =
           session.session_type.toLowerCase() === "once" ? "once" : "recurring";
@@ -331,6 +335,8 @@ export default function EditSessionPage() {
         name: className.trim(),
 
         role: role === "head" ? "Head Coach" : "Assistant Coach",
+
+        default_location: defaultLocation.trim() || null,
       };
 
       const requestBody =
@@ -452,6 +458,19 @@ export default function EditSessionPage() {
               value={className}
               onChange={(e) => setClassName(e.target.value)}
               required
+              style={inputStyle}
+            />
+          </label>
+
+          {/* Default Location */}
+
+          <label>
+            Default Location
+            <input
+              type="text"
+              value={defaultLocation}
+              onChange={(e) => setDefaultLocation(e.target.value)}
+              placeholder="President's College Pool"
               style={inputStyle}
             />
           </label>

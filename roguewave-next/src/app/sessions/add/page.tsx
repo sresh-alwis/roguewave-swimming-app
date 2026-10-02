@@ -43,6 +43,8 @@ function AddSessionForm() {
 
   const [className, setClassName] = useState("");
 
+  const [defaultLocation, setDefaultLocation] = useState("");
+
   const [sessionType, setSessionType] = useState<SessionType>("");
 
   const [role, setRole] = useState<Role>("");
@@ -220,7 +222,7 @@ function AddSessionForm() {
 
         role: role === "head" ? "Head Coach" : "Assistant Coach",
 
-        default_location: null,
+        default_location: defaultLocation.trim() || null,
       };
 
       const requestBody =
@@ -310,6 +312,19 @@ function AddSessionForm() {
               onChange={(e) => setClassName(e.target.value)}
               placeholder="Example: RogueWave Learn to Swim"
               required
+              style={inputStyle}
+            />
+          </label>
+
+          {/* Default Location */}
+
+          <label>
+            Default Location
+            <input
+              type="text"
+              value={defaultLocation}
+              onChange={(e) => setDefaultLocation(e.target.value)}
+              placeholder="President's College Pool"
               style={inputStyle}
             />
           </label>

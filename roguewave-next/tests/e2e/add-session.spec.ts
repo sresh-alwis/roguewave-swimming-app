@@ -113,6 +113,62 @@ test.describe("Add Session", () => {
     await expect(page).toHaveURL(/\/sessions$/);
   });
 
+  test("E2E: Add Session form contains Default Location and submits it", async ({
+    page,
+  }) => {
+    // Arrange: mock POST /api/sessions
+    let capturedBody: any = null;
+
+    await page.route(SESSIONS_URL, (route) => {
+      if (route.request().method() === "POST") {
+        capturedBody = route.request().postDataJSON();
+        return route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "Session created successfully.",
+            session: {
+              id: 2,
+              name: "RogueWave Masters",
+              role: "Head Coach",
+              session_type: "recurring",
+              default_location: "President's College Pool",
+              session_date: null,
+              start_time: null,
+              end_time: null,
+            },
+          }),
+        });
+      }
+      return route.continue();
+    });
+
+    // Act: open Add Session page
+    await page.goto("/sessions/add");
+
+    // Assert: Default Location field exists
+    const locationInput = page.getByPlaceholder("President's College Pool");
+    await expect(locationInput).toBeVisible();
+
+    // Fill the form
+    await page.getByPlaceholder("Example: RogueWave Learn to Swim").fill("RogueWave Masters");
+    await page.getByPlaceholder("President's College Pool").fill("President's College Pool");
+    await page.getByLabel("Session Type").selectOption("recurring");
+    await page.getByLabel("My Role").selectOption("head");
+
+    // Fill schedule
+    await page.getByLabel("Day").first().selectOption("Wednesday");
+    await page.getByLabel("Start Time").first().fill("14:00");
+    await page.getByLabel("End Time").first().fill("15:00");
+
+    // Click Save
+    await page.getByRole("button", { name: "Save Session" }).click();
+
+    // Assert: POST body contains default_location
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.default_location).toBe("President's College Pool");
+  });
+
   test("E2E: Failed save stays on Add Session form", async ({ page }) => {
     // Arrange: mock POST /api/sessions returning an error
     let postCount = 0;
