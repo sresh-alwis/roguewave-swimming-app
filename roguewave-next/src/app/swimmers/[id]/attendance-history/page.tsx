@@ -1,96 +1,90 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
-type AttendanceStatus = "Present" | "Absent";
+type HistoryRecord = {
+  attendance_id: number;
+  attendance_date: string;
+  attendance_status: string;
+  session_id: number;
+  session_name: string;
+  location: string | null;
+  session_status: string;
+};
 
-type AttendanceRecord = {
-  date: string;
-  status: AttendanceStatus;
+type Summary = {
+  total_records: number;
+  present_count: number;
+  absent_count: number;
+  attendance_percentage: number;
+  sessions_completed: number;
 };
 
 type Swimmer = {
   id: number;
   name: string;
-  attendance: AttendanceRecord[];
 };
 
-const swimmers: Swimmer[] = [
-  {
-    id: 1,
-    name: "Isali Rozairo",
-    attendance: [
-      {
-        date: "2026-09-17",
-        status: "Present",
-      },
-      {
-        date: "2026-09-12",
-        status: "Present",
-      },
-      {
-        date: "2026-09-10",
-        status: "Absent",
-      },
-      {
-        date: "2026-09-05",
-        status: "Present",
-      },
-    ],
-  },
+type AttendanceHistoryResponse = {
+  swimmer: Swimmer;
+  summary: Summary;
+  records: HistoryRecord[];
+};
 
-  {
-    id: 2,
-    name: "Pawani Rozairo",
-    attendance: [
-      {
-        date: "2026-09-17",
-        status: "Present",
-      },
-      {
-        date: "2026-09-12",
-        status: "Absent",
-      },
-      {
-        date: "2026-09-10",
-        status: "Present",
-      },
-    ],
-  },
+export default function AttendanceHistoryPage() {
+  const params = useParams<{ id: string }>();
+  const swimmerId = params.id;
 
-  {
-    id: 3,
-    name: "Swimmer 3",
-    attendance: [
-      {
-        date: "2026-09-17",
-        status: "Present",
-      },
-      {
-        date: "2026-09-12",
-        status: "Present",
-      },
-      {
-        date: "2026-09-10",
-        status: "Present",
-      },
-    ],
-  },
-];
+  const [data, setData] = useState<AttendanceHistoryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-export default async function AttendanceHistoryPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const response = await fetch(`/api/swimmers/${swimmerId}/attendance-history`, {
+          cache: "no-store",
+        });
 
-  const swimmer = swimmers.find((swimmer) => swimmer.id === Number(id));
+        const result = await response.json();
 
-  if (!swimmer) {
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to load attendance history.");
+        }
+
+        setData(result);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load attendance history.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (swimmerId) {
+      loadHistory();
+    }
+  }, [swimmerId]);
+
+  if (loading) {
     return (
       <main style={pageStyle}>
         <section style={notFoundStyle}>
-          <h1>Swimmer not found</h1>
+          <p>Loading attendance history...</p>
+        </section>
+      </main>
+    );
+  }
 
+  if (error || !data) {
+    return (
+      <main style={pageStyle}>
+        <section style={notFoundStyle}>
+          <h1>Error</h1>
+          <p style={mutedTextStyle}>{error}</p>
           <Link href="/swimmers" style={buttonLinkStyle}>
             Back to Swimmers
           </Link>
@@ -99,9 +93,7 @@ export default async function AttendanceHistoryPage({
     );
   }
 
-  const attendance = [...swimmer.attendance].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
+  const { swimmer, summary, records } = data;
 
   return (
     <main style={pageStyle}>
@@ -154,26 +146,38 @@ export default async function AttendanceHistoryPage({
           </Link>
         </div>
 
+        {/* Summary Cards */}
+        <div style={summaryGridStyle}>
+          <SummaryCard label="Total Attendance Records" value={summary.total_records} />
+          <SummaryCard label="Present" value={summary.present_count} />
+          <SummaryCard label="Absent" value={summary.absent_count} />
+          <SummaryCard label="Attendance %" value={`${summary.attendance_percentage}%`} />
+          <SummaryCard label="Sessions Completed" value={summary.sessions_completed} />
+        </div>
+
+        {/* History Table */}
         <div style={cardStyle}>
           <div style={tableHeaderStyle}>
             <strong>Date</strong>
-
+            <strong>Session</strong>
+            <strong>Location</strong>
             <strong>Status</strong>
           </div>
 
-          {attendance.length > 0 ? (
-            attendance.map((record) => (
-              <div key={record.date} style={attendanceRowStyle}>
-                <span>{formatDate(record.date)}</span>
-
+          {records.length > 0 ? (
+            records.map((record) => (
+              <div key={record.attendance_id} style={attendanceRowStyle}>
+                <span>{formatDate(record.attendance_date)}</span>
+                <span>{record.session_name}</span>
+                <span>{record.location || "-"}</span>
                 <span
                   style={
-                    record.status === "Present"
+                    record.attendance_status === "present"
                       ? presentBadgeStyle
                       : absentBadgeStyle
                   }
                 >
-                  {record.status}
+                  {record.attendance_status === "present" ? "Present" : "Absent"}
                 </span>
               </div>
             ))
@@ -183,6 +187,15 @@ export default async function AttendanceHistoryPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div style={summaryCardStyle}>
+      <span style={summaryLabelStyle}>{label}</span>
+      <strong style={summaryValueStyle}>{value}</strong>
+    </div>
   );
 }
 
@@ -255,8 +268,35 @@ const subtitleStyle = {
   margin: "6px 0 0 0",
 };
 
+const summaryGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: "15px",
+  marginBottom: "30px",
+};
+
+const summaryCardStyle = {
+  backgroundColor: "var(--card)",
+  color: "var(--text)",
+  padding: "20px",
+  borderRadius: "10px",
+  border: "1px solid var(--border)",
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "8px",
+};
+
+const summaryLabelStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "13px",
+};
+
+const summaryValueStyle = {
+  fontSize: "28px",
+};
+
 const cardStyle = {
-  maxWidth: "850px",
+  maxWidth: "900px",
   backgroundColor: "var(--card)",
   color: "var(--text)",
   padding: "clamp(18px, 4vw, 25px)",
@@ -266,7 +306,7 @@ const cardStyle = {
 
 const tableHeaderStyle = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
+  gridTemplateColumns: "120px 1fr 1fr auto",
   gap: "20px",
   padding: "0 12px 12px",
   color: "var(--secondary-text)",
@@ -275,7 +315,7 @@ const tableHeaderStyle = {
 
 const attendanceRowStyle = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
+  gridTemplateColumns: "120px 1fr 1fr auto",
   alignItems: "center",
   gap: "20px",
   padding: "15px 12px",
@@ -338,4 +378,9 @@ const notFoundStyle = {
   padding: "30px",
   borderRadius: "10px",
   border: "1px solid var(--border)",
+  textAlign: "center" as const,
+};
+
+const mutedTextStyle = {
+  color: "var(--secondary-text)",
 };

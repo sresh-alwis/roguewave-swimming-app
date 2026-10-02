@@ -166,3 +166,42 @@ export function buildRestoreRows(
     attendance_status: s.attendance_status,
   }));
 }
+
+/* =========================
+   ATTENDANCE SUMMARY CALCULATION
+   ========================= */
+
+export type AttendanceSummary = {
+  total_records: number;
+  present_count: number;
+  absent_count: number;
+  attendance_percentage: number;
+  sessions_completed: number;
+};
+
+/**
+ * Calculate attendance summary from swimmer attendance rows.
+ * Excludes cancelled sessions from all counts.
+ */
+export function calculateAttendanceSummary(
+  rows: { attendance_status: string; session_status?: string }[],
+): AttendanceSummary {
+  const validRows = rows.filter((r) => r.session_status !== "cancelled");
+
+  const total_records = validRows.length;
+  const present_count = validRows.filter((r) => r.attendance_status === "present").length;
+  const absent_count = validRows.filter((r) => r.attendance_status === "absent").length;
+
+  const denominator = present_count + absent_count;
+  const attendance_percentage = denominator === 0 ? 0 : Math.round((present_count / denominator) * 100);
+
+  const sessions_completed = present_count;
+
+  return {
+    total_records,
+    present_count,
+    absent_count,
+    attendance_percentage,
+    sessions_completed,
+  };
+}

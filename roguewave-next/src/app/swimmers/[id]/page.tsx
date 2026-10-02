@@ -32,6 +32,7 @@ type ApiSwimmer = {
   notes: string | null;
   created_at: string;
   sessions: ApiSession[];
+  sessionsCompleted: number;
 };
 
 type Swimmer = {
@@ -101,8 +102,7 @@ export default function SwimmerProfilePage() {
             ? formatDate(apiSwimmer.date_joined)
             : "Not set",
 
-          // Attendance is not connected yet.
-          sessionsCompleted: 0,
+          sessionsCompleted: apiSwimmer.sessionsCompleted ?? 0,
 
           assignedSessions: apiSwimmer.sessions || [],
 

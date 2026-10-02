@@ -304,6 +304,33 @@ export function createSessionsQueryBuilder(
         return { data: hydrated, error: null };
       }
 
+      // Handle attendance_swimmers nested select for attendance-history
+      if (table === "attendance_swimmers") {
+        const hydrated = results.map((row) => {
+          const attendanceRecord = state.attendance_records.find(
+            (ar) => ar.id === row.attendance_id,
+          );
+          if (!attendanceRecord) return { ...row, attendance_records: null };
+
+          const session = state.sessions.find(
+            (s) => s.id === attendanceRecord.session_id,
+          );
+
+          return {
+            ...row,
+            attendance_records: {
+              ...attendanceRecord,
+              sessions: session || null,
+            },
+          };
+        });
+
+        if (isSingle) {
+          return { data: hydrated[0] ?? null, error: null };
+        }
+        return { data: hydrated, error: null };
+      }
+
       if (isSingle) {
         const row = results[0] ?? null;
         if (row) {
