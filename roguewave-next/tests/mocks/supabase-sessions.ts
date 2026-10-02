@@ -34,6 +34,7 @@ type Filter = {
   column: string;
   value: any;
   negate?: boolean;
+  operator?: string;
 };
 
 type NestedSelect = {
@@ -76,6 +77,15 @@ export function createSessionsQueryBuilder(
     return tableData.filter((row) =>
       filters.every((f) => {
         if (f.negate) {
+          return row[f.column] !== f.value;
+        }
+        if (f.operator === "gte") {
+          return row[f.column] >= f.value;
+        }
+        if (f.operator === "lte") {
+          return row[f.column] <= f.value;
+        }
+        if (f.operator === "neq") {
           return row[f.column] !== f.value;
         }
         if (Array.isArray(f.value)) {
@@ -123,9 +133,37 @@ export function createSessionsQueryBuilder(
   }
 
   const builder = {
-    select(arg?: string) {
+    select(arg?: string | { count?: string; head?: boolean }, options?: { count?: string; head?: boolean }) {
       isSelect = true;
-      if (arg) {
+      // Handle select("*", { count: "exact", head: true })
+      const opts = options ?? (arg && typeof arg === "object" ? arg : undefined);
+      if (opts?.head) {
+        // Return a builder-like object that supports chaining and returns count when awaited
+        const headBuilder = {
+          neq(col: string, val: any) {
+            filters.push({ column: col, value: val, operator: "neq" });
+            return headBuilder;
+          },
+          eq(col: string, val: any) {
+            filters.push({ column: col, value: val });
+            return headBuilder;
+          },
+          gte(col: string, val: any) {
+            filters.push({ column: col, value: val, operator: "gte" });
+            return headBuilder;
+          },
+          lte(col: string, val: any) {
+            filters.push({ column: col, value: val, operator: "lte" });
+            return headBuilder;
+          },
+          then(resolve: any, reject: any) {
+            const filtered = applyFilters();
+            return Promise.resolve({ count: filtered.length, error: null }).then(resolve, reject);
+          },
+        };
+        return headBuilder;
+      }
+      if (arg && typeof arg === "string") {
         nestedSelect = parseNestedSelect(arg);
       }
       return builder;
@@ -148,6 +186,14 @@ export function createSessionsQueryBuilder(
     },
     neq(column: string, value: any) {
       filters.push({ column, value, negate: true });
+      return builder;
+    },
+    gte(column: string, value: any) {
+      filters.push({ column, value, operator: "gte" });
+      return builder;
+    },
+    lte(column: string, value: any) {
+      filters.push({ column, value, operator: "lte" });
       return builder;
     },
     in(column: string, values: any[]) {

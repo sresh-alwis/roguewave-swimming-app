@@ -3,65 +3,31 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-
-type Schedule = {
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-};
-
-type Session = {
-  id: number;
+type CalendarOccurrence = {
+  session_id: number;
   name: string;
   role: string;
-  swimmers: number;
-  schedules: Schedule[];
+  session_type: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  has_attendance: boolean;
+  attendance_record_id: number | null;
+  session_status: string | null;
 };
 
-const sessions: Session[] = [
-  {
-    id: 1,
-    name: "RogueWave Learn to Swim",
-    role: "Head Coach",
-    swimmers: 4,
-    schedules: [
-      {
-        dayOfWeek: 4,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-      {
-        dayOfWeek: 6,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-    ],
-  },
+type Summary = {
+  total_swimmers: number;
+  total_sessions: number;
+  sessions_completed: number;
+  upcoming_sessions: number;
+};
 
-  {
-    id: 2,
-    name: "Coach Gayani Adult Class",
-    role: "Assistant Coach",
-    swimmers: 0,
-    schedules: [
-      {
-        dayOfWeek: 6,
-        startTime: "18:00",
-        endTime: "19:00",
-      },
-      {
-        dayOfWeek: 0,
-        startTime: "18:00",
-        endTime: "19:00",
-      },
-      {
-        dayOfWeek: 3,
-        startTime: "19:00",
-        endTime: "20:00",
-      },
-    ],
-  },
-];
+type HomeData = {
+  summary: Summary;
+  calendar: CalendarOccurrence[];
+};
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -95,7 +61,9 @@ function HomeContent({
   setMonthOffset: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [now, setNow] = useState<Date>(() => new Date());
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [homeData, setHomeData] = useState<HomeData | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -104,75 +72,59 @@ function HomeContent({
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    async function loadHome() {
+      try {
+        const response = await fetch(`/api/home?month_offset=${monthOffset}`, {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load home data.");
+        }
+
+        setHomeData(data);
+        setError("");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load home data.");
+      }
+    }
+
+    loadHome();
+  }, [monthOffset]);
+
   const calendarMonth = useMemo(() => {
     return new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   }, [now, monthOffset]);
 
+  const selectedDateStr = selectedDate ? formatDateKey(selectedDate) : null;
+
+  const selectedDaySessions = useMemo(() => {
+    if (!homeData || !selectedDateStr) return [];
+    return homeData.calendar.filter((occ) => occ.date === selectedDateStr);
+  }, [homeData, selectedDateStr]);
+
   const nextSession = useMemo(() => {
-    const possibleSessions = [];
+    if (!homeData) return null;
 
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + i,
-      );
+    const todayStr = formatDateKey(now);
+    const upcoming = homeData.calendar
+      .filter((occ) => occ.date >= todayStr)
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.start_time.localeCompare(b.start_time);
+      });
 
-      const sessionsThatDay = getSessionsForDate(date);
-
-      for (const session of sessionsThatDay) {
-        const sessionDateTime = createSessionDateTime(date, session.startTime);
-
-        if (sessionDateTime >= now) {
-          possibleSessions.push({
-            ...session,
-            date,
-            sessionDateTime,
-          });
-        }
-      }
-
-      if (possibleSessions.length > 0) {
-        break;
-      }
-    }
-
-    possibleSessions.sort(
-      (a, b) => a.sessionDateTime.getTime() - b.sessionDateTime.getTime(),
-    );
-
-    return possibleSessions[0] || null;
-  }, [now]);
-
-  function getSessionsForDate(date: Date) {
-    const day = date.getDay();
-
-    return sessions
-      .flatMap((session) =>
-        session.schedules
-          .filter((schedule) => schedule.dayOfWeek === day)
-          .map((schedule) => ({
-            ...session,
-            startTime: schedule.startTime,
-            endTime: schedule.endTime,
-            date,
-          })),
-      )
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }
-
-  const selectedDaySessions = selectedDate
-    ? getSessionsForDate(selectedDate)
-    : [];
+    return upcoming[0] || null;
+  }, [homeData, now]);
 
   const year = calendarMonth.getFullYear();
-
   const month = calendarMonth.getMonth();
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
   const firstDayOfMonth = new Date(year, month, 1).getDay();
-
   const leadingEmptyDays = (firstDayOfMonth + 6) % 7;
 
   const calendarCells: (Date | null)[] = [];
@@ -194,12 +146,11 @@ function HomeContent({
   }
 
   function goToToday() {
-    if (!now) return;
-
     setMonthOffset(0);
-
-    setSelectedDate(now);
+    setSelectedDate(new Date());
   }
+
+  const summary = homeData?.summary;
 
   return (
     <main style={pageStyle}>
@@ -260,18 +211,33 @@ function HomeContent({
           </Link>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div style={errorStyle}>
+            <p>{error}</p>
+          </div>
+        )}
+
         {/* Summary */}
         <div style={summaryGridStyle}>
           <div style={summaryCardStyle}>
-            <span style={summaryLabelStyle}>My Swimmers</span>
-
-            <strong style={summaryNumberStyle}>4</strong>
+            <span style={summaryLabelStyle}>Total Swimmers</span>
+            <strong style={summaryNumberStyle}>{summary?.total_swimmers ?? 0}</strong>
           </div>
 
           <div style={summaryCardStyle}>
-            <span style={summaryLabelStyle}>Sessions This Month</span>
+            <span style={summaryLabelStyle}>Total Sessions</span>
+            <strong style={summaryNumberStyle}>{summary?.total_sessions ?? 0}</strong>
+          </div>
 
-            <strong style={summaryNumberStyle}>12</strong>
+          <div style={summaryCardStyle}>
+            <span style={summaryLabelStyle}>Sessions Completed</span>
+            <strong style={summaryNumberStyle}>{summary?.sessions_completed ?? 0}</strong>
+          </div>
+
+          <div style={summaryCardStyle}>
+            <span style={summaryLabelStyle}>Upcoming Sessions</span>
+            <strong style={summaryNumberStyle}>{summary?.upcoming_sessions ?? 0}</strong>
           </div>
         </div>
 
@@ -286,9 +252,6 @@ function HomeContent({
               </p>
             </div>
 
-            {/* IMPORTANT:
-                from=home tells Add Session
-                where Close should return */}
             <Link href="/sessions/add?from=home">
               <button style={buttonStyle}>+ Add Session</button>
             </Link>
@@ -338,15 +301,17 @@ function HomeContent({
                   return <div key={`empty-${index}`} style={emptyDayStyle} />;
                 }
 
-                const daySessions = getSessionsForDate(date);
+                const dateKey = formatDateKey(date);
+                const daySessions = homeData?.calendar.filter(
+                  (occ) => occ.date === dateKey,
+                ) ?? [];
 
                 const isToday = sameDate(date, now);
-
                 const isSelected = selectedDate && sameDate(date, selectedDate);
 
                 return (
                   <button
-                    key={date.toISOString()}
+                    key={dateKey}
                     onClick={() => setSelectedDate(date)}
                     style={{
                       ...calendarDayStyle,
@@ -391,13 +356,17 @@ function HomeContent({
               ) : (
                 selectedDaySessions.map((session) => (
                   <div
-                    key={`${session.id}-${session.startTime}`}
+                    key={`${session.session_id}-${session.date}-${session.start_time}`}
                     style={informationRowStyle}
                   >
                     <div>
                       <strong>{session.name}</strong>
 
                       <p style={smallTextStyle}>{session.role}</p>
+
+                      {session.location && (
+                        <p style={smallTextStyle}>{session.location}</p>
+                      )}
                     </div>
 
                     <div
@@ -406,14 +375,16 @@ function HomeContent({
                       }}
                     >
                       <strong>
-                        {formatTime(session.startTime)} -{" "}
-                        {formatTime(session.endTime)}
+                        {formatTime(session.start_time)} -{" "}
+                        {formatTime(session.end_time)}
                       </strong>
 
-                      {session.swimmers > 0 && (
-                        <p style={smallTextStyle}>
-                          {session.swimmers} swimmers
-                        </p>
+                      {session.session_status === "cancelled" && (
+                        <p style={cancelledTextStyle}>Cancelled</p>
+                      )}
+
+                      {session.has_attendance && session.session_status !== "cancelled" && (
+                        <p style={attendanceTextStyle}>Attendance marked</p>
                       )}
                     </div>
                   </div>
@@ -450,11 +421,11 @@ function HomeContent({
             <div style={upcomingCardStyle}>
               <div style={dateBadgeStyle}>
                 <strong>
-                  {nextSession.date.getDate().toString().padStart(2, "0")}
+                  {new Date(nextSession.date + "T00:00:00").getDate().toString().padStart(2, "0")}
                 </strong>
 
                 <span>
-                  {nextSession.date.toLocaleDateString("en-GB", {
+                  {new Date(nextSession.date + "T00:00:00").toLocaleDateString("en-GB", {
                     month: "short",
                   })}
                 </span>
@@ -471,33 +442,35 @@ function HomeContent({
 
                 <p style={smallTextStyle}>{nextSession.role}</p>
 
+                {nextSession.location && (
+                  <p style={smallTextStyle}>{nextSession.location}</p>
+                )}
+
                 <p
                   style={{
                     margin: "8px 0",
                     fontWeight: "bold",
                   }}
                 >
-                  {formatTime(nextSession.startTime)} -{" "}
-                  {formatTime(nextSession.endTime)}
+                  {formatTime(nextSession.start_time)} -{" "}
+                  {formatTime(nextSession.end_time)}
                 </p>
 
-                {nextSession.swimmers > 0 && (
-                  <p style={smallTextStyle}>{nextSession.swimmers} swimmers</p>
+                {nextSession.session_status === "cancelled" && (
+                  <p style={cancelledTextStyle}>Cancelled</p>
                 )}
               </div>
 
-              {sameDate(nextSession.date, now) ? (
+              {sameDate(new Date(nextSession.date + "T00:00:00"), now) ? (
                 <Link
-                  href={`/attendance/${nextSession.id}?date=${formatDateKey(
-                    nextSession.date,
-                  )}`}
+                  href={`/attendance/${nextSession.session_id}?date=${nextSession.date}`}
                 >
                   <button style={buttonStyle}>Mark Attendance</button>
                 </Link>
               ) : (
                 <button style={disabledButtonStyle} disabled>
                   Available on{" "}
-                  {nextSession.date.toLocaleDateString("en-GB", {
+                  {new Date(nextSession.date + "T00:00:00").toLocaleDateString("en-GB", {
                     day: "numeric",
                     month: "short",
                   })}
@@ -511,19 +484,6 @@ function HomeContent({
   );
 }
 
-function createSessionDateTime(date: Date, time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    hours,
-    minutes,
-    0,
-  );
-}
-
 function sameDate(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -534,12 +494,17 @@ function sameDate(a: Date, b: Date) {
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
-
   const month = String(date.getMonth() + 1).padStart(2, "0");
-
   const day = String(date.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
+}
+
+function formatTime(time: string) {
+  const [hourText, minute] = time.split(":");
+  const hour = Number(hourText);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minute} ${period}`;
 }
 
 const loadingStyle = {
@@ -551,17 +516,13 @@ const loadingStyle = {
   color: "var(--text)",
 };
 
-function formatTime(time: string) {
-  const [hourText, minute] = time.split(":");
-
-  const hour = Number(hourText);
-
-  const period = hour >= 12 ? "PM" : "AM";
-
-  const displayHour = hour % 12 || 12;
-
-  return `${displayHour}:${minute} ${period}`;
-}
+const errorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "15px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+};
 
 const pageStyle = {
   minHeight: "100vh",
@@ -772,6 +733,18 @@ const smallTextStyle = {
 
 const mutedTextStyle = {
   color: "var(--secondary-text)",
+};
+
+const cancelledTextStyle = {
+  margin: "4px 0",
+  color: "var(--danger-text)",
+  fontWeight: "bold",
+};
+
+const attendanceTextStyle = {
+  margin: "4px 0",
+  color: "var(--success-text)",
+  fontWeight: "bold",
 };
 
 const upcomingCardStyle = {
