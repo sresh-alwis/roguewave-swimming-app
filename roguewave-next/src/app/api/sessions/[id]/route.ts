@@ -556,6 +556,30 @@ export async function DELETE(
     );
   }
 
+  // Check for attendance history before allowing deletion
+  const { data: attendanceRecords, error: attendanceError } = await supabaseServer
+    .from("attendance_records")
+    .select("id")
+    .eq("session_id", sessionId);
+
+  if (attendanceError) {
+    return NextResponse.json(
+      {
+        error: attendanceError.message,
+      },
+      { status: 500 },
+    );
+  }
+
+  if (attendanceRecords && attendanceRecords.length > 0) {
+    return NextResponse.json(
+      {
+        error: "This session has attendance history and cannot be deleted.",
+      },
+      { status: 409 },
+    );
+  }
+
   const { error } = await supabaseServer
     .from("sessions")
     .delete()

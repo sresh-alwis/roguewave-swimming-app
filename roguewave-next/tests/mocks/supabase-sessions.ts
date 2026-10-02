@@ -239,6 +239,26 @@ export function createSessionsQueryBuilder(
         }
       }
 
+      // Simulate FK behaviour when deleting sessions
+      if (table === "sessions") {
+        const deletedIds = results.map((r) => r.id);
+
+        // CASCADE: remove session_schedules rows for deleted sessions
+        state.session_schedules = state.session_schedules.filter(
+          (s) => !deletedIds.includes(s.session_id),
+        );
+
+        // CASCADE: remove session_swimmers rows for deleted sessions
+        state.session_swimmers = state.session_swimmers.filter(
+          (ss) => !deletedIds.includes(ss.session_id),
+        );
+
+        // CASCADE: remove attendance_records rows for deleted sessions
+        state.attendance_records = state.attendance_records.filter(
+          (ar) => !deletedIds.includes(ar.session_id),
+        );
+      }
+
       results.forEach((row) => {
         const index = tableData.indexOf(row);
         if (index > -1) tableData.splice(index, 1);
