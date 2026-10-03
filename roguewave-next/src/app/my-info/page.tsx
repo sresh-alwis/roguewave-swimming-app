@@ -1,227 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-type CoachingRecord = {
-  name: string;
-  role: string;
-  sessions: number;
-  hours: number;
-};
-
-type HistoryStatus = "Completed" | "Cancelled" | "Absent" | "Holiday";
-
-type HistoryRecord = {
+type CoachingHistoryRecord = {
+  attendance_id: number;
   date: string;
+  session_name: string;
+  role: string;
+  location: string | null;
+  session_status: string;
+};
+
+type Session = {
+  id: number;
   name: string;
   role: string;
-  status: HistoryStatus;
+  session_type: string;
+  default_location: string | null;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  session_schedules: {
+    id: number;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
 };
 
-const monthlyRecords: Record<string, CoachingRecord[]> = {
-  "2026-09": [
-    {
-      name: "RogueWave",
-      role: "Head Coach",
-      sessions: 8,
-      hours: 8,
-    },
-    {
-      name: "Coach Gayani",
-      role: "Assistant Coach",
-      sessions: 6,
-      hours: 6,
-    },
-    {
-      name: "Gold March Academy",
-      role: "Assistant Coach",
-      sessions: 3,
-      hours: 4,
-    },
-  ],
-
-  "2026-08": [
-    {
-      name: "RogueWave",
-      role: "Head Coach",
-      sessions: 7,
-      hours: 7,
-    },
-    {
-      name: "Coach Gayani",
-      role: "Assistant Coach",
-      sessions: 5,
-      hours: 5,
-    },
-    {
-      name: "Gold March Academy",
-      role: "Assistant Coach",
-      sessions: 2,
-      hours: 3,
-    },
-  ],
+type MyInfoData = {
+  current_swimmers: number;
+  total_coaching_sessions: number;
+  sessions: Session[];
+  history: CoachingHistoryRecord[];
 };
-
-const yearlyRecords: Record<string, CoachingRecord[]> = {
-  "2026": [
-    {
-      name: "RogueWave",
-      role: "Head Coach",
-      sessions: 54,
-      hours: 54,
-    },
-    {
-      name: "Coach Gayani",
-      role: "Assistant Coach",
-      sessions: 42,
-      hours: 42,
-    },
-    {
-      name: "Gold March Academy",
-      role: "Assistant Coach",
-      sessions: 18,
-      hours: 25,
-    },
-  ],
-
-  "2025": [
-    {
-      name: "RogueWave",
-      role: "Head Coach",
-      sessions: 16,
-      hours: 16,
-    },
-    {
-      name: "Coach Gayani",
-      role: "Assistant Coach",
-      sessions: 6,
-      hours: 6,
-    },
-  ],
-};
-
-const allTimeRecords: CoachingRecord[] = [
-  {
-    name: "RogueWave",
-    role: "Head Coach",
-    sessions: 70,
-    hours: 70,
-  },
-  {
-    name: "Coach Gayani",
-    role: "Assistant Coach",
-    sessions: 48,
-    hours: 48,
-  },
-  {
-    name: "Gold March Academy",
-    role: "Assistant Coach",
-    sessions: 24,
-    hours: 31,
-  },
-];
-
-const history: HistoryRecord[] = [
-  {
-    date: "2026-09-23",
-    name: "RogueWave",
-    role: "Head Coach",
-    status: "Completed",
-  },
-  {
-    date: "2026-09-22",
-    name: "Coach Gayani",
-    role: "Assistant Coach",
-    status: "Completed",
-  },
-  {
-    date: "2026-09-20",
-    name: "Gold March Academy",
-    role: "Assistant Coach",
-    status: "Completed",
-  },
-  {
-    date: "2026-09-19",
-    name: "RogueWave",
-    role: "Head Coach",
-    status: "Cancelled",
-  },
-  {
-    date: "2026-09-17",
-    name: "RogueWave",
-    role: "Head Coach",
-    status: "Completed",
-  },
-  {
-    date: "2026-09-16",
-    name: "Coach Gayani",
-    role: "Assistant Coach",
-    status: "Absent",
-  },
-  {
-    date: "2026-09-13",
-    name: "Coach Gayani",
-    role: "Assistant Coach",
-    status: "Completed",
-  },
-  {
-    date: "2026-09-12",
-    name: "RogueWave",
-    role: "Head Coach",
-    status: "Completed",
-  },
-];
-
-const months = [
-  { value: "01", name: "January" },
-  { value: "02", name: "February" },
-  { value: "03", name: "March" },
-  { value: "04", name: "April" },
-  { value: "05", name: "May" },
-  { value: "06", name: "June" },
-  { value: "07", name: "July" },
-  { value: "08", name: "August" },
-  { value: "09", name: "September" },
-  { value: "10", name: "October" },
-  { value: "11", name: "November" },
-  { value: "12", name: "December" },
-];
 
 export default function MyInfoPage() {
-  const [viewBy, setViewBy] = useState<"month" | "year" | "all">("month");
+  const [data, setData] = useState<MyInfoData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [selectedMonth, setSelectedMonth] = useState("09");
+  useEffect(() => {
+    async function loadMyInfo() {
+      try {
+        const response = await fetch("/api/my-info", {
+          cache: "no-store",
+        });
 
-  const [selectedYear, setSelectedYear] = useState("2026");
+        const result = await response.json();
 
-  const [showFullHistory, setShowFullHistory] = useState(false);
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to load coaching profile.");
+        }
 
-  let displayedRecords: CoachingRecord[] = [];
+        setData(result);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load coaching profile.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  if (viewBy === "month") {
-    displayedRecords = monthlyRecords[`${selectedYear}-${selectedMonth}`] || [];
+    loadMyInfo();
+  }, []);
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <section style={loadingStyle}>Loading coaching profile...</section>
+      </main>
+    );
   }
 
-  if (viewBy === "year") {
-    displayedRecords = yearlyRecords[selectedYear] || [];
+  if (error || !data) {
+    return (
+      <main style={pageStyle}>
+        <section style={notFoundStyle}>
+          <h1>Error</h1>
+          <p style={mutedTextStyle}>{error}</p>
+          <Link href="/home" style={buttonLinkStyle}>
+            Back to Home
+          </Link>
+        </section>
+      </main>
+    );
   }
-
-  if (viewBy === "all") {
-    displayedRecords = allTimeRecords;
-  }
-
-  const totalSessions = allTimeRecords.reduce(
-    (total, record) => total + record.sessions,
-    0,
-  );
-
-  const totalHours = allTimeRecords.reduce(
-    (total, record) => total + record.hours,
-    0,
-  );
-
-  const visibleHistory = showFullHistory ? history : history.slice(0, 4);
 
   return (
     <main style={pageStyle}>
@@ -240,12 +106,22 @@ export default function MyInfoPage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link
+            href="/my-info"
+            style={{
+              ...linkStyle,
+              ...activeLinkStyle,
+            }}
+          >
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>
@@ -274,14 +150,7 @@ export default function MyInfoPage() {
         {/* Coach Info */}
         <div style={coachInfoStyle}>
           <div>
-            <h2
-              style={{
-                margin: "0 0 5px 0",
-              }}
-            >
-              Sreshta Alwis
-            </h2>
-
+            <h2 style={{ margin: "0 0 5px 0" }}>Sreshta Alwis</h2>
             <p style={coachSquadStyle}>RogueWave Swimming</p>
           </div>
 
@@ -291,176 +160,106 @@ export default function MyInfoPage() {
         {/* Summary */}
         <div style={summaryGridStyle}>
           <div style={summaryCardStyle}>
-            <span style={summaryLabelStyle}>My Swimmers</span>
-
-            <strong style={summaryNumberStyle}>4</strong>
-
-            <span style={allTimeLabelStyle}>All Time</span>
+            <span style={summaryLabelStyle}>Current Swimmers</span>
+            <strong style={summaryNumberStyle}>{data.current_swimmers}</strong>
           </div>
 
           <div style={summaryCardStyle}>
             <span style={summaryLabelStyle}>Total Coaching Sessions</span>
-
-            <strong style={summaryNumberStyle}>{totalSessions}</strong>
-
+            <strong style={summaryNumberStyle}>{data.total_coaching_sessions}</strong>
             <span style={allTimeLabelStyle}>All Time</span>
-          </div>
-
-          <div style={summaryCardStyle}>
-            <span style={summaryLabelStyle}>Total Coaching Hours</span>
-
-            <strong style={summaryNumberStyle}>{totalHours}</strong>
-
-            <span style={allTimeLabelStyle}>Hours • All Time</span>
           </div>
         </div>
 
-        {/* Coaching Record */}
+        {/* My Sessions */}
         <div style={largeCardStyle}>
-          <div>
-            <h2 style={{ margin: 0 }}>Coaching Record</h2>
+          <h2 style={{ margin: 0 }}>My Sessions</h2>
 
-            <p style={subtitleStyle}>
-              View your coaching activity by month, year or all time.
-            </p>
-          </div>
+          <p style={subtitleStyle}>Your assigned coaching sessions.</p>
 
-          {/* Filters */}
-          <div style={filterRowStyle}>
-            <label>
-              View By
-              <select
-                value={viewBy}
-                onChange={(e) =>
-                  setViewBy(e.target.value as "month" | "year" | "all")
-                }
-                style={selectStyle}
-              >
-                <option value="month">Month</option>
-
-                <option value="year">Year</option>
-
-                <option value="all">All Time</option>
-              </select>
-            </label>
-
-            {viewBy === "month" && (
-              <label>
-                Month
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  style={selectStyle}
-                >
-                  {months.map((month) => (
-                    <option key={month.value} value={month.value}>
-                      {month.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {(viewBy === "month" || viewBy === "year") && (
-              <label>
-                Year
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="2026">2026</option>
-
-                  <option value="2025">2025</option>
-                </select>
-              </label>
-            )}
-          </div>
-
-          {/* Records */}
-          {displayedRecords.length === 0 ? (
-            <div style={emptyStyle}>No coaching records for this period.</div>
+          {data.sessions.length === 0 ? (
+            <div style={emptyStyle}>No sessions yet.</div>
           ) : (
-            <div>
-              {displayedRecords.map((record) => (
-                <div key={record.name} style={recordRowStyle}>
-                  <div>
-                    <strong>{record.name}</strong>
+            <div style={sessionListStyle}>
+              {data.sessions.map((session) => (
+                <div key={session.id} style={sessionRowStyle}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Link
+                      href={`/sessions/edit/${session.id}`}
+                      style={sessionNameStyle}
+                    >
+                      {session.name}
+                    </Link>
 
-                    <p style={recordRoleStyle}>{record.role}</p>
+                    <p style={recordRoleStyle}>{session.role}</p>
+
+                    <p style={sessionDetailStyle}>
+                      {session.session_type === "once"
+                        ? `Once • ${formatDate(session.session_date || "")} • ${formatTime(session.start_time || "")} - ${formatTime(session.end_time || "")}`
+                        : `Recurring • ${session.session_schedules.map((s) => `${getDayName(s.day_of_week)} ${formatTime(s.start_time)} - ${formatTime(s.end_time)}`).join(", ")}`}
+                    </p>
+
+                    {session.default_location && (
+                      <p style={sessionLocationStyle}>{session.default_location}</p>
+                    )}
                   </div>
 
-                  <div style={recordNumbersStyle}>
-                    <div>
-                      <span style={smallLabelStyle}>Sessions</span>
-
-                      <strong>{record.sessions}</strong>
-                    </div>
-
-                    <div>
-                      <span style={smallLabelStyle}>Hours</span>
-
-                      <strong>{record.hours}</strong>
-                    </div>
-                  </div>
+                  <span style={typeBadgeStyle}>
+                    {session.session_type === "once" ? "Once" : "Recurring"}
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Session History */}
-        <div
-          style={{
-            ...largeCardStyle,
-            marginTop: "25px",
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0 }}>Session History</h2>
+        {/* Coaching History */}
+        <div style={{ ...largeCardStyle, marginTop: "25px" }}>
+          <h2 style={{ margin: 0 }}>Coaching History</h2>
 
-            <p style={subtitleStyle}>Your recorded coaching sessions.</p>
-          </div>
+          <p style={subtitleStyle}>Your recorded coaching sessions.</p>
 
-          <div style={historyWrapperStyle}>
-            <div style={historyTableStyle}>
-              <div style={historyHeaderStyle}>
-                <strong>Date</strong>
-
-                <strong>Session</strong>
-
-                <strong>Status</strong>
-              </div>
-
-              {visibleHistory.map((session, index) => (
-                <div
-                  key={`${session.date}-${session.name}-${index}`}
-                  style={historyRowStyle}
-                >
-                  <span>{formatDate(session.date)}</span>
-
-                  <div>
-                    <strong>{session.name}</strong>
-
-                    <p style={recordRoleStyle}>{session.role}</p>
-                  </div>
-
-                  <span style={getStatusStyle(session.status)}>
-                    {session.status}
-                  </span>
+          {data.history.length === 0 ? (
+            <div style={emptyStyle}>No coaching history yet.</div>
+          ) : (
+            <div style={historyWrapperStyle}>
+              <div style={historyTableStyle}>
+                <div style={historyHeaderStyle}>
+                  <strong>Date</strong>
+                  <strong>Session</strong>
+                  <strong>Role</strong>
+                  <strong>Status</strong>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {history.length > 4 && (
-            <button
-              type="button"
-              style={secondaryButtonStyle}
-              onClick={() => setShowFullHistory((current) => !current)}
-            >
-              {showFullHistory ? "Show Less" : "View Full History"}
-            </button>
+                {data.history.map((record) => (
+                  <div
+                    key={record.attendance_id}
+                    style={historyRowStyle}
+                  >
+                    <span>{formatDate(record.date)}</span>
+
+                    <div>
+                      <strong>{record.session_name}</strong>
+                      {record.location && (
+                        <p style={recordRoleStyle}>{record.location}</p>
+                      )}
+                    </div>
+
+                    <span>{record.role}</span>
+
+                    <span
+                      style={
+                        record.session_status === "cancelled"
+                          ? cancelledBadgeStyle
+                          : completedBadgeStyle
+                      }
+                    >
+                      {record.session_status === "cancelled" ? "Cancelled" : "Completed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </section>
@@ -469,6 +268,7 @@ export default function MyInfoPage() {
 }
 
 function formatDate(date: string) {
+  if (!date) return "Not set";
   return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -476,37 +276,26 @@ function formatDate(date: string) {
   });
 }
 
-function getStatusStyle(status: HistoryStatus) {
-  if (status === "Completed") {
-    return {
-      ...statusBadgeStyle,
-      backgroundColor: "var(--success-background)",
-      color: "var(--success-text)",
-    };
-  }
+function formatTime(time: string) {
+  if (!time) return "-";
+  const [hourText, minute] = time.split(":");
+  const hour = Number(hourText);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minute} ${period}`;
+}
 
-  if (status === "Cancelled") {
-    return {
-      ...statusBadgeStyle,
-      backgroundColor: "var(--danger-background)",
-      color: "var(--danger-text)",
-    };
-  }
-
-  if (status === "Absent") {
-    return {
-      ...statusBadgeStyle,
-      backgroundColor: "var(--warning-background)",
-      color: "var(--warning-text)",
-    };
-  }
-
-  return {
-    ...statusBadgeStyle,
-    backgroundColor: "var(--soft-background)",
-    color: "var(--secondary-text)",
-    border: "1px solid var(--border)",
-  };
+function getDayName(dayOfWeek: number) {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  return days[dayOfWeek] ?? "Unknown";
 }
 
 const pageStyle = {
@@ -515,6 +304,25 @@ const pageStyle = {
   color: "var(--text)",
   display: "flex",
   fontFamily: "Arial, sans-serif",
+};
+
+const loadingStyle = {
+  minHeight: "100vh",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "var(--background)",
+  color: "var(--text)",
+};
+
+const notFoundStyle = {
+  maxWidth: "600px",
+  margin: "40px auto",
+  backgroundColor: "var(--card)",
+  padding: "30px",
+  borderRadius: "10px",
+  border: "1px solid var(--border)",
+  textAlign: "center" as const,
 };
 
 const sidebarStyle = {
@@ -544,6 +352,10 @@ const linkStyle = {
   fontSize: "16px",
   padding: "10px 12px",
   borderRadius: "6px",
+};
+
+const activeLinkStyle = {
+  backgroundColor: "rgba(255,255,255,0.12)",
 };
 
 const mainContentStyle = {
@@ -634,34 +446,29 @@ const largeCardStyle = {
   border: "1px solid var(--border)",
 };
 
-const filterRowStyle = {
+const sessionListStyle = {
   display: "flex",
+  flexDirection: "column" as const,
   gap: "15px",
-  alignItems: "end",
-  flexWrap: "wrap" as const,
-  marginTop: "22px",
-  marginBottom: "22px",
+  marginTop: "20px",
 };
 
-const selectStyle = {
-  display: "block",
-  minWidth: "140px",
-  padding: "10px",
-  marginTop: "6px",
-  backgroundColor: "var(--card)",
-  color: "var(--text)",
-  border: "1px solid var(--border)",
-  borderRadius: "5px",
-};
-
-const recordRowStyle = {
+const sessionRowStyle = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: "20px",
-  flexWrap: "wrap" as const,
-  padding: "18px 0",
-  borderBottom: "1px solid var(--border)",
+  padding: "15px",
+  backgroundColor: "var(--soft-background)",
+  borderRadius: "8px",
+  border: "1px solid var(--border)",
+};
+
+const sessionNameStyle: React.CSSProperties = {
+  fontWeight: "bold",
+  fontSize: "16px",
+  color: "var(--text)",
+  textDecoration: "none",
 };
 
 const recordRoleStyle = {
@@ -670,70 +477,81 @@ const recordRoleStyle = {
   fontSize: "14px",
 };
 
-const recordNumbersStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(70px, 90px))",
-  gap: "15px",
-  textAlign: "right" as const,
+const sessionDetailStyle = {
+  margin: "5px 0 0 0",
+  color: "var(--secondary-text)",
+  fontSize: "13px",
 };
 
-const smallLabelStyle = {
-  display: "block",
+const sessionLocationStyle = {
+  margin: "3px 0 0 0",
   color: "var(--secondary-text)",
+  fontSize: "13px",
+};
+
+const typeBadgeStyle = {
+  backgroundColor: "var(--accent-background)",
+  color: "var(--accent-text)",
   fontSize: "12px",
-  marginBottom: "4px",
+  fontWeight: "bold",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  flexShrink: 0,
 };
 
 const historyWrapperStyle = {
   width: "100%",
   overflowX: "auto" as const,
+  marginTop: "20px",
 };
 
 const historyTableStyle = {
-  minWidth: "560px",
+  minWidth: "600px",
 };
 
 const historyHeaderStyle = {
   display: "grid",
-  gridTemplateColumns: "150px 1fr 130px",
+  gridTemplateColumns: "120px 1fr 120px 100px",
   gap: "20px",
-  padding: "20px 0 10px",
+  padding: "0 0 10px",
   color: "var(--secondary-text)",
   borderBottom: "1px solid var(--border)",
 };
 
 const historyRowStyle = {
   display: "grid",
-  gridTemplateColumns: "150px 1fr 130px",
+  gridTemplateColumns: "120px 1fr 120px 100px",
   gap: "20px",
   padding: "15px 0",
   borderBottom: "1px solid var(--border)",
   alignItems: "center",
 };
 
-const statusBadgeStyle = {
+const completedBadgeStyle = {
   display: "inline-block",
-  padding: "6px 10px",
+  padding: "5px 10px",
   borderRadius: "20px",
-  fontSize: "13px",
+  fontSize: "12px",
   fontWeight: "bold",
   textAlign: "center" as const,
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+};
+
+const cancelledBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textAlign: "center" as const,
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
 };
 
 const emptyStyle = {
   padding: "25px 0",
   color: "var(--secondary-text)",
-};
-
-const secondaryButtonStyle = {
-  backgroundColor: "var(--secondary-button)",
-  color: "var(--text)",
-  border: "1px solid var(--border)",
-  borderRadius: "6px",
-  padding: "10px 18px",
-  cursor: "pointer",
-  fontWeight: "bold",
-  marginTop: "20px",
 };
 
 const secondaryLinkStyle = {
@@ -745,4 +563,18 @@ const secondaryLinkStyle = {
   padding: "10px 18px",
   textDecoration: "none",
   fontWeight: "bold",
+};
+
+const buttonLinkStyle = {
+  display: "inline-block",
+  backgroundColor: "var(--button)",
+  color: "var(--button-text)",
+  padding: "10px 18px",
+  borderRadius: "6px",
+  textDecoration: "none",
+  fontWeight: "bold",
+};
+
+const mutedTextStyle = {
+  color: "var(--secondary-text)",
 };

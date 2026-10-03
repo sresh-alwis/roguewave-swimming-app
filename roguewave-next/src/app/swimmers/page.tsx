@@ -20,6 +20,7 @@ type ApiSwimmer = {
   weight_kg: number | null;
   notes: string | null;
   created_at: string;
+  sessionsCompleted?: number;
 };
 
 export default function SwimmersPage() {
@@ -52,8 +53,7 @@ export default function SwimmersPage() {
 
             level: getLevel(swimmer.level),
 
-            // Attendance database is not connected yet.
-            sessionsCompleted: 0,
+            sessionsCompleted: swimmer.sessionsCompleted ?? 0,
           }),
         );
 
@@ -98,12 +98,16 @@ export default function SwimmersPage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>

@@ -172,10 +172,6 @@ export default function SessionsPage() {
             Swimmers
           </Link>
 
-          <Link href="/attendance" style={linkStyle}>
-            Attendance
-          </Link>
-
           <Link
             href="/sessions"
             style={{
@@ -184,6 +180,14 @@ export default function SessionsPage() {
             }}
           >
             Sessions
+          </Link>
+
+          <Link href="/attendance" style={linkStyle}>
+            Attendance
+          </Link>
+
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>
@@ -337,7 +341,17 @@ export default function SessionsPage() {
                         </span>
 
                         <div style={swimmerNamesStyle}>
-                          {session.swimmers.map((swimmer) => swimmer.name).join(", ")}
+                          {session.swimmers.map((swimmer, index) => (
+                            <span key={swimmer.id}>
+                              {index > 0 && ", "}
+                              <Link
+                                href={`/swimmers/${swimmer.id}`}
+                                style={swimmerLinkStyle}
+                              >
+                                {swimmer.name}
+                              </Link>
+                            </span>
+                          ))}
                         </div>
                       </>
                     ) : (
@@ -572,6 +586,12 @@ const swimmerNamesStyle = {
   color: "var(--secondary-text)",
   fontSize: "13px",
   marginTop: "4px",
+};
+
+const swimmerLinkStyle = {
+  color: "var(--accent-text)",
+  textDecoration: "none",
+  fontWeight: "bold",
 };
 
 const mutedTextStyle = {

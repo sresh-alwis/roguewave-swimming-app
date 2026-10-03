@@ -217,12 +217,16 @@ export default function SwimmerProfilePage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>
@@ -309,7 +313,9 @@ export default function SwimmerProfilePage() {
               <div style={assignedSessionsListStyle}>
                 {swimmer.assignedSessions.map((session) => (
                   <div key={session.id} style={assignedSessionItemStyle}>
-                    <div style={assignedSessionNameStyle}>{session.name}</div>
+                    <Link href={`/sessions/edit/${session.id}`} style={assignedSessionNameStyle}>
+                      {session.name}
+                    </Link>
                     <div style={assignedSessionDetailStyle}>
                       {session.session_type === "once"
                         ? `Once • ${formatDate(session.session_date || "")} • ${formatTime(session.start_time || "")} - ${formatTime(session.end_time || "")}`

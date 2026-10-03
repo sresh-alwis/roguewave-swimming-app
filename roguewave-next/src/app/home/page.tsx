@@ -175,12 +175,16 @@ function HomeContent({
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>
@@ -360,7 +364,12 @@ function HomeContent({
                     style={informationRowStyle}
                   >
                     <div>
-                      <strong>{session.name}</strong>
+                      <Link
+                        href={`/sessions/edit/${session.session_id}`}
+                        style={sessionNameLinkStyle}
+                      >
+                        <strong>{session.name}</strong>
+                      </Link>
 
                       <p style={smallTextStyle}>{session.role}</p>
 
@@ -385,6 +394,17 @@ function HomeContent({
 
                       {session.has_attendance && session.session_status !== "cancelled" && (
                         <p style={attendanceTextStyle}>Attendance marked</p>
+                      )}
+
+                      {session.session_status !== "cancelled" && (
+                        <Link
+                          href={`/attendance/${session.session_id}?date=${session.date}`}
+                          style={attendanceLinkStyle}
+                        >
+                          <button style={smallButtonStyle}>
+                            {session.has_attendance ? "View Attendance" : "Mark Attendance"}
+                          </button>
+                        </Link>
                       )}
                     </div>
                   </div>
@@ -770,4 +790,14 @@ const dateBadgeStyle = {
   justifyContent: "center",
   alignItems: "center",
   fontSize: "16px",
+};
+
+const sessionNameLinkStyle = {
+  color: "var(--text)",
+  textDecoration: "none",
+};
+
+const attendanceLinkStyle = {
+  display: "inline-block",
+  marginTop: "8px",
 };

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { calculateAttendanceSummary } from "@/lib/attendance-helpers";
 
 const validLevels = ["Beginner", "Intermediate", "Advanced"];
 
@@ -26,7 +27,36 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json(data);
+  // Calculate sessionsCompleted for each swimmer
+  const swimmersWithStats = await Promise.all(
+    (data ?? []).map(async (swimmer) => {
+      const { data: attendanceRows } = await supabaseServer
+        .from("attendance_swimmers")
+        .select(
+          `
+          attendance_status,
+          attendance_records (
+            session_status
+          )
+          `,
+        )
+        .eq("swimmer_id", swimmer.id);
+
+      const summary = calculateAttendanceSummary(
+        (attendanceRows ?? []).map((row) => ({
+          attendance_status: row.attendance_status,
+          session_status: (row.attendance_records as { session_status?: string })?.session_status,
+        })),
+      );
+
+      return {
+        ...swimmer,
+        sessionsCompleted: summary.sessions_completed,
+      };
+    }),
+  );
+
+  return NextResponse.json(swimmersWithStats);
 }
 
 /* =========================

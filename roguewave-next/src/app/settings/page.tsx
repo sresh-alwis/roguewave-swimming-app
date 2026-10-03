@@ -19,12 +19,25 @@ function useTheme(): Theme {
   );
 }
 
+function useLocalStorage(key: string, initialValue: string): [string, (value: string) => void] {
+  const [value, setValue] = useState(() => {
+    if (typeof window === "undefined") return initialValue;
+    const saved = localStorage.getItem(key);
+    return saved ?? initialValue;
+  });
+
+  function updateValue(newValue: string) {
+    setValue(newValue);
+    localStorage.setItem(key, newValue);
+    window.dispatchEvent(new Event("storage"));
+  }
+
+  return [value, updateValue];
+}
+
 export default function SettingsPage() {
-  const [coachName, setCoachName] = useState("Sreshta Alwis");
-
-  const [squadName, setSquadName] = useState("RogueWave Swimming");
-
-  const [email, setEmail] = useState("sreshta@example.com");
+  const [coachName, setCoachName] = useLocalStorage("roguewave-coach-name", "Sreshta Alwis");
+  const [squadName, setSquadName] = useLocalStorage("roguewave-squad-name", "RogueWave Swimming");
 
   const theme = useTheme();
 
@@ -66,9 +79,7 @@ export default function SettingsPage() {
 
   function handleThemeChange(selectedTheme: Theme) {
     localStorage.setItem("roguewave-theme", selectedTheme);
-
     window.dispatchEvent(new Event("storage"));
-
     applyTheme(selectedTheme);
   }
 
@@ -85,15 +96,7 @@ export default function SettingsPage() {
       return;
     }
 
-    alert("Settings saved - database will be connected later.");
-  }
-
-  function handlePasswordChange() {
-    alert("Password change will work after authentication is connected.");
-  }
-
-  function handleLogout() {
-    alert("Logout will work after authentication is connected.");
+    alert("Settings saved.");
   }
 
   return (
@@ -113,12 +116,16 @@ export default function SettingsPage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link
@@ -140,7 +147,7 @@ export default function SettingsPage() {
             <h1 style={{ margin: 0 }}>Settings</h1>
 
             <p style={subtitleStyle}>
-              Manage your profile, account and appearance.
+              Manage your profile and appearance.
             </p>
           </div>
         </div>
@@ -177,32 +184,6 @@ export default function SettingsPage() {
             </label>
           </div>
 
-          {/* Account */}
-          <div style={cardStyle}>
-            <h2 style={cardTitleStyle}>Account</h2>
-
-            <p style={cardSubtitleStyle}>Login and account information.</p>
-
-            <label style={labelStyle}>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={inputStyle}
-              />
-            </label>
-
-            <button
-              type="button"
-              style={secondaryButtonStyle}
-              onClick={handlePasswordChange}
-            >
-              Change Password
-            </button>
-          </div>
-
           {/* Appearance */}
           <div style={cardStyle}>
             <h2 style={cardTitleStyle}>Appearance</h2>
@@ -219,9 +200,7 @@ export default function SettingsPage() {
                 style={inputStyle}
               >
                 <option value="light">Light</option>
-
                 <option value="dark">Dark</option>
-
                 <option value="system">System Default</option>
               </select>
             </label>
@@ -235,14 +214,6 @@ export default function SettingsPage() {
           <div style={buttonRowStyle}>
             <button type="submit" style={buttonStyle}>
               Save Changes
-            </button>
-
-            <button
-              type="button"
-              style={logoutButtonStyle}
-              onClick={handleLogout}
-            >
-              Logout
             </button>
           </div>
         </form>
@@ -364,17 +335,4 @@ const buttonStyle = {
   padding: "10px 20px",
   cursor: "pointer",
   fontWeight: "bold",
-};
-
-const secondaryButtonStyle = {
-  ...buttonStyle,
-  backgroundColor: "var(--secondary-button)",
-  color: "var(--text)",
-  border: "1px solid var(--border)",
-  marginTop: "18px",
-};
-
-const logoutButtonStyle = {
-  ...buttonStyle,
-  backgroundColor: "var(--danger)",
 };

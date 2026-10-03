@@ -118,12 +118,16 @@ export default function AttendanceHistoryPage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link href="/attendance" style={linkStyle}>
             Attendance
           </Link>
 
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
+          <Link href="/my-info" style={linkStyle}>
+            My Info
           </Link>
 
           <Link href="/settings" style={linkStyle}>

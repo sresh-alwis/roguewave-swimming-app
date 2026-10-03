@@ -129,6 +129,10 @@ export default function AttendancePage() {
             Sessions
           </Link>
 
+          <Link href="/my-info" style={linkStyle}>
+            My Info
+          </Link>
+
           <Link href="/settings" style={linkStyle}>
             Settings
           </Link>
@@ -191,7 +195,7 @@ export default function AttendancePage() {
                         {session.swimmers} swimmers
                       </span>
                     ) : (
-                      <span style={assistantBadgeStyle}>My attendance only</span>
+                      <span style={assistantBadgeStyle}>Coach attendance only</span>
                     )}
                   </div>
 
@@ -239,7 +243,7 @@ export default function AttendancePage() {
                   <p style={helperTextStyle}>
                     {session.swimmers > 0
                       ? "Mark each swimmer as present or absent."
-                      : "Record your own coaching attendance for this session."}
+                      : "Swimmer attendance is not managed for Assistant Coach sessions."}
                   </p>
                 </div>
 
