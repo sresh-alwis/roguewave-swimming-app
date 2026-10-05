@@ -24,6 +24,7 @@ export type Session = {
   session_date: string | null;
   start_time: string | null;
   end_time: string | null;
+  is_archived?: boolean;
   session_schedules: SessionSchedule[];
   session_swimmers: SessionSwimmer[];
 };

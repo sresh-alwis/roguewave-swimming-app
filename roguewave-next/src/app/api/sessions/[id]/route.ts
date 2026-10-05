@@ -107,6 +107,7 @@ export async function PATCH(
       start_time,
       end_time,
       swimmer_ids,
+      is_archived,
     } = body;
 
     /* =========================
@@ -246,6 +247,10 @@ export async function PATCH(
 
     if (default_location !== undefined) {
       updates.default_location = default_location || null;
+    }
+
+    if (is_archived !== undefined) {
+      updates.is_archived = is_archived;
     }
 
     /*

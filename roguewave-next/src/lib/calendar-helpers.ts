@@ -48,6 +48,9 @@ export function generateCalendarOccurrences(
   }
 
   for (const session of sessions) {
+    // Archived sessions do not generate future calendar occurrences
+    if (session.is_archived) continue;
+
     if (session.session_type === "once") {
       // Once session: appears only on session_date
       if (!session.session_date) continue;

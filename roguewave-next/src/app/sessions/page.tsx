@@ -25,6 +25,8 @@ type Session = {
   date?: string;
   startTime?: string;
   endTime?: string;
+  has_attendance?: boolean;
+  is_archived?: boolean;
 };
 
 type ApiSchedule = {
@@ -50,19 +52,27 @@ type ApiSession = {
   session_swimmers: {
     swimmers: Swimmer | null;
   }[];
+
+  has_attendance?: boolean;
+  is_archived?: boolean;
 };
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [view, setView] = useState<"active" | "archived">("active");
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [archivingId, setArchivingId] = useState<number | null>(null);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadSessions() {
       try {
-        const response = await fetch("/api/sessions", {
+        const endpoint =
+          view === "archived" ? "/api/sessions?archived=true" : "/api/sessions";
+        const response = await fetch(endpoint, {
           cache: "no-store",
         });
 
@@ -110,6 +120,9 @@ export default function SessionsPage() {
 
                 endTime: formatTime(schedule.end_time),
               })),
+
+            has_attendance: session.has_attendance,
+            is_archived: session.is_archived,
           }),
         );
 
@@ -124,7 +137,9 @@ export default function SessionsPage() {
     }
 
     loadSessions();
-  }, []);
+  }, [view]);
+
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   async function deleteSession(id: number, name: string) {
     const confirmed = window.confirm(`Delete "${name}"?`);
@@ -145,12 +160,82 @@ export default function SessionsPage() {
       }
 
       setSessions((current) => current.filter((session) => session.id !== id));
+      setFeedback({ type: "success", message: "Session deleted successfully." });
     } catch (error) {
-      alert(
-        error instanceof Error ? error.message : "Failed to delete session.",
-      );
+      setFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to delete session.",
+      });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function archiveSession(id: number, name: string) {
+    const confirmed = window.confirm(
+      `Archive "${name}"? It will stop appearing in active schedules and future calendar occurrences. Attendance history will be kept.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setArchivingId(id);
+
+      const response = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to archive session.");
+      }
+
+      setSessions((current) => current.filter((session) => session.id !== id));
+      setFeedback({ type: "success", message: "Session archived successfully." });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to archive session.",
+      });
+    } finally {
+      setArchivingId(null);
+    }
+  }
+
+  async function restoreSession(id: number, name: string) {
+    const confirmed = window.confirm(
+      `Restore "${name}"? It will become active and start generating future occurrences again.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setRestoringId(id);
+
+      const response = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: false }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to restore session.");
+      }
+
+      setSessions((current) => current.filter((session) => session.id !== id));
+      setFeedback({ type: "success", message: "Session restored successfully." });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to restore session.",
+      });
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -219,6 +304,28 @@ export default function SessionsPage() {
           </Link>
         </div>
 
+        {/* View Tabs */}
+        <div style={tabContainerStyle}>
+          <button
+            style={{
+              ...tabStyle,
+              ...(view === "active" ? activeTabStyle : {}),
+            }}
+            onClick={() => setView("active")}
+          >
+            Active
+          </button>
+          <button
+            style={{
+              ...tabStyle,
+              ...(view === "archived" ? activeTabStyle : {}),
+            }}
+            onClick={() => setView("archived")}
+          >
+            Archived
+          </button>
+        </div>
+
         {/* Loading */}
 
         {loading && (
@@ -234,6 +341,19 @@ export default function SessionsPage() {
             <strong>Could not load sessions.</strong>
 
             <p style={mutedTextStyle}>{error}</p>
+          </div>
+        )}
+
+        {/* Feedback */}
+        {feedback && (
+          <div
+            style={
+              feedback.type === "success"
+                ? feedbackSuccessStyle
+                : feedbackErrorStyle
+            }
+          >
+            {feedback.message}
           </div>
         )}
 
@@ -264,7 +384,12 @@ export default function SessionsPage() {
                       <p style={roleStyle}>{session.role}</p>
                     </div>
 
-                    <span style={badgeStyle}>{session.type}</span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {session.is_archived && (
+                        <span style={archivedBadgeStyle}>Archived</span>
+                      )}
+                      <span style={badgeStyle}>{session.type}</span>
+                    </div>
                   </div>
 
                   {/* Recurring */}
@@ -363,27 +488,73 @@ export default function SessionsPage() {
                 {/* Actions */}
 
                 <div style={actionStyle}>
-                  <Link
-                    href={`/sessions/edit/${session.id}`}
-                    style={actionLinkStyle}
-                  >
-                    <button style={actionButtonStyle}>Edit</button>
-                  </Link>
+                  {view === "active" ? (
+                    <>
+                      <Link
+                        href={`/sessions/edit/${session.id}`}
+                        style={actionLinkStyle}
+                      >
+                        <button style={actionButtonStyle}>Edit</button>
+                      </Link>
 
-                  <button
-                    style={{
-                      ...deleteButtonStyle,
+                      {session.has_attendance ? (
+                        <div style={deleteDisabledStyle}>
+                          <button
+                            style={archiveButtonStyle}
+                            disabled={archivingId === session.id}
+                            onClick={() => archiveSession(session.id, session.name)}
+                          >
+                            {archivingId === session.id ? "Archiving..." : "Archive"}
+                          </button>
+                          <span style={deleteExplanationStyle}>
+                            Attendance history exists, so this session can be archived but not deleted.
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          style={{
+                            ...deleteButtonStyle,
 
-                      opacity: deletingId === session.id ? 0.6 : 1,
+                            opacity: deletingId === session.id ? 0.6 : 1,
 
-                      cursor:
-                        deletingId === session.id ? "not-allowed" : "pointer",
-                    }}
-                    disabled={deletingId === session.id}
-                    onClick={() => deleteSession(session.id, session.name)}
-                  >
-                    {deletingId === session.id ? "Deleting..." : "Delete"}
-                  </button>
+                            cursor:
+                              deletingId === session.id ? "not-allowed" : "pointer",
+                          }}
+                          disabled={deletingId === session.id}
+                          onClick={() => deleteSession(session.id, session.name)}
+                        >
+                          {deletingId === session.id ? "Deleting..." : "Delete"}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        style={restoreButtonStyle}
+                        disabled={restoringId === session.id}
+                        onClick={() => restoreSession(session.id, session.name)}
+                      >
+                        {restoringId === session.id ? "Restoring..." : "Restore"}
+                      </button>
+
+                      {!session.has_attendance && (
+                        <button
+                          style={{
+                            ...deleteButtonStyle,
+
+                            opacity: deletingId === session.id ? 0.6 : 1,
+
+                            cursor:
+                              deletingId === session.id ? "not-allowed" : "pointer",
+                          }}
+                          disabled={deletingId === session.id}
+                          onClick={() => deleteSession(session.id, session.name)}
+                        >
+                          {deletingId === session.id ? "Deleting..." : "Delete"}
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -392,15 +563,19 @@ export default function SessionsPage() {
 
             {sessions.length === 0 && (
               <div style={emptyStyle}>
-                <h3>No sessions yet</h3>
+                <h3>{view === "archived" ? "No archived sessions" : "No sessions yet"}</h3>
 
                 <p style={mutedTextStyle}>
-                  Add your first coaching session to get started.
+                  {view === "archived"
+                    ? "Archived sessions will appear here."
+                    : "Add your first coaching session to get started."}
                 </p>
 
-                <Link href="/sessions/add">
-                  <button style={buttonStyle}>+ Add Session</button>
-                </Link>
+                {view === "active" && (
+                  <Link href="/sessions/add">
+                    <button style={buttonStyle}>+ Add Session</button>
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -412,7 +587,7 @@ export default function SessionsPage() {
 
 /* =========================
    HELPERS
-========================= */
+   ========================= */
 
 function getDayName(dayOfWeek: number) {
   const days = [
@@ -452,7 +627,7 @@ function formatDate(date: string) {
 
 /* =========================
    STYLES
-========================= */
+   ========================= */
 
 const pageStyle = {
   minHeight: "100vh",
@@ -507,12 +682,35 @@ const topStyle = {
   alignItems: "center",
   gap: "20px",
   flexWrap: "wrap" as const,
-  marginBottom: "30px",
+  marginBottom: "20px",
 };
 
 const subtitleStyle = {
   color: "var(--secondary-text)",
   margin: "6px 0 0 0",
+};
+
+const tabContainerStyle = {
+  display: "flex",
+  gap: "8px",
+  marginBottom: "25px",
+};
+
+const tabStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
+  padding: "8px 20px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
+const activeTabStyle = {
+  backgroundColor: "var(--button)",
+  color: "var(--button-text)",
+  border: "1px solid var(--button)",
 };
 
 const sessionListStyle = {
@@ -553,6 +751,16 @@ const badgeStyle = {
   fontWeight: "bold",
   padding: "6px 10px",
   borderRadius: "20px",
+};
+
+const archivedBadgeStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
+  fontSize: "12px",
+  fontWeight: "bold",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  border: "1px solid var(--border)",
 };
 
 const scheduleListStyle = {
@@ -630,6 +838,31 @@ const deleteButtonStyle = {
   backgroundColor: "var(--danger)",
 };
 
+const archiveButtonStyle = {
+  ...actionButtonStyle,
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+};
+
+const restoreButtonStyle = {
+  ...actionButtonStyle,
+  backgroundColor: "var(--button)",
+  color: "var(--button-text)",
+};
+
+const deleteDisabledStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "6px",
+};
+
+const deleteExplanationStyle = {
+  fontSize: "12px",
+  color: "var(--secondary-text)",
+  maxWidth: "200px",
+};
+
 const emptyStyle = {
   backgroundColor: "var(--card)",
   color: "var(--text)",
@@ -642,4 +875,22 @@ const emptyStyle = {
 const errorStyle = {
   ...emptyStyle,
   border: "1px solid var(--danger)",
+};
+
+const feedbackSuccessStyle = {
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
+};
+
+const feedbackErrorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
 };

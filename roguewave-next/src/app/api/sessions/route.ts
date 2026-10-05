@@ -11,7 +11,12 @@ type ScheduleInput = {
    GET ALL SESSIONS
 ========================= */
 
-export async function GET() {
+export async function GET(request?: Request) {
+  const url = request?.url ?? "http://localhost/api/sessions";
+  const { searchParams } = new URL(url);
+  const archivedParam = searchParams.get("archived");
+  const showArchived = archivedParam === "true";
+
   const { data, error } = await supabaseServer
     .from("sessions")
     .select(
@@ -32,6 +37,7 @@ export async function GET() {
       )
     `,
     )
+    .eq("is_archived", showArchived)
     .order("id", {
       ascending: true,
     });
@@ -47,7 +53,28 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json(data);
+  // Check which sessions have attendance history
+  const sessionIds = (data ?? []).map((s) => s.id);
+  let attendanceSessionIds = new Set<number>();
+
+  if (sessionIds.length > 0) {
+    const { data: attendanceData } = await supabaseServer
+      .from("attendance_records")
+      .select("session_id")
+      .in("session_id", sessionIds);
+
+    attendanceSessionIds = new Set(
+      (attendanceData ?? []).map((a) => a.session_id),
+    );
+  }
+
+  // Add has_attendance flag to each session
+  const sessionsWithAttendance = (data ?? []).map((session) => ({
+    ...session,
+    has_attendance: attendanceSessionIds.has(session.id),
+  }));
+
+  return NextResponse.json(sessionsWithAttendance);
 }
 
 /* =========================

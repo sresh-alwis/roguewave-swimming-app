@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const year = targetMonth.getFullYear();
   const month = targetMonth.getMonth();
 
-  // Get all sessions with schedules and swimmer counts
+  // Get active sessions only (archived sessions do not generate calendar occurrences)
   const { data: sessions, error: sessionsError } = await supabaseServer
     .from("sessions")
     .select(
@@ -46,6 +46,7 @@ export async function GET(request: Request) {
       )
       `,
     )
+    .eq("is_archived", false)
     .order("id", { ascending: true });
 
   if (sessionsError) {

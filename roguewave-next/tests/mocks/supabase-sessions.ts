@@ -67,6 +67,7 @@ export function createSessionsQueryBuilder(
   let isSelect = false;
   let isSingle = false;
   let nestedSelect: NestedSelect | null = null;
+  let lastSelectArg: string | null = null;
 
   function getTableData(): Record<string, any>[] {
     return state[table as keyof MockSessionsState] as Record<string, any>[];
@@ -76,22 +77,26 @@ export function createSessionsQueryBuilder(
     const tableData = getTableData();
     return tableData.filter((row) =>
       filters.every((f) => {
+        // Treat missing is_archived as false for backward compatibility
+        const value = f.column === "is_archived" && row[f.column] === undefined
+          ? false
+          : row[f.column];
         if (f.negate) {
-          return row[f.column] !== f.value;
+          return value !== f.value;
         }
         if (f.operator === "gte") {
-          return row[f.column] >= f.value;
+          return value >= f.value;
         }
         if (f.operator === "lte") {
-          return row[f.column] <= f.value;
+          return value <= f.value;
         }
         if (f.operator === "neq") {
-          return row[f.column] !== f.value;
+          return value !== f.value;
         }
         if (Array.isArray(f.value)) {
-          return f.value.includes(row[f.column]);
+          return f.value.includes(value);
         }
-        return row[f.column] === f.value;
+        return value === f.value;
       }),
     );
   }
@@ -112,6 +117,7 @@ export function createSessionsQueryBuilder(
       });
     return {
       ...row,
+      is_archived: row.is_archived ?? false,
       session_schedules: schedules,
       session_swimmers: sessionSwimmers,
     };
@@ -135,6 +141,9 @@ export function createSessionsQueryBuilder(
   const builder = {
     select(arg?: string | { count?: string; head?: boolean }, options?: { count?: string; head?: boolean }) {
       isSelect = true;
+      if (typeof arg === "string") {
+        lastSelectArg = arg;
+      }
       // Handle select("*", { count: "exact", head: true })
       const opts = options ?? (arg && typeof arg === "object" ? arg : undefined);
       if (opts?.head) {
@@ -314,13 +323,33 @@ export function createSessionsQueryBuilder(
 
     // Handle select
     if (isSelect) {
+      // Handle attendance_records with nested sessions (for coaching history / my-info)
+      if (table === "attendance_records" && lastSelectArg?.includes("sessions (")) {
+        const hydrated = results.map((row) => {
+          const session = state.sessions.find(
+            (s) => s.id === row.session_id,
+          );
+          return {
+            ...row,
+            sessions: session || null,
+          };
+        });
+
+        if (isSingle) {
+          return { data: hydrated[0] ?? null, error: null };
+        }
+        return { data: hydrated, error: null };
+      }
+
       // Handle nested select (e.g., session_swimmers → sessions → session_schedules)
       if (nestedSelect) {
         const { table, nestedTable } = nestedSelect;
         const singularTable = table.replace(/s$/, "");
-        const fkColumn = [`${singularTable}_id`, `${table}_id`].find(
-          (col) => col in results[0],
-        );
+        const fkColumn = results.length > 0
+          ? [`${singularTable}_id`, `${table}_id`].find(
+              (col) => col in results[0],
+            )
+          : undefined;
 
         const hydrated = results.map((row) => {
           if (!fkColumn) return { ...row, [table]: null };
@@ -368,6 +397,24 @@ export function createSessionsQueryBuilder(
               ...attendanceRecord,
               sessions: session || null,
             },
+          };
+        });
+
+        if (isSingle) {
+          return { data: hydrated[0] ?? null, error: null };
+        }
+        return { data: hydrated, error: null };
+      }
+
+      // Handle attendance_records nested select for coaching history (my-info)
+      if (table === "attendance_records" && nestedSelect) {
+        const hydrated = results.map((row) => {
+          const session = state.sessions.find(
+            (s) => s.id === row.session_id,
+          );
+          return {
+            ...row,
+            sessions: session || null,
           };
         });
 

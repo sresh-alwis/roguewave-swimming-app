@@ -22,7 +22,7 @@ export async function GET() {
     return NextResponse.json({ error: sessionsError.message }, { status: 500 });
   }
 
-  // Get all sessions
+  // Get active sessions only for the session list
   const { data: sessions, error: allSessionsError } = await supabaseServer
     .from("sessions")
     .select(
@@ -36,6 +36,7 @@ export async function GET() {
       )
       `,
     )
+    .eq("is_archived", false)
     .order("id", { ascending: true });
 
   if (allSessionsError) {
@@ -55,7 +56,8 @@ export async function GET() {
       sessions (
         id,
         name,
-        role
+        role,
+        is_archived
       )
       `,
     )
@@ -69,7 +71,7 @@ export async function GET() {
   const history = (attendanceRecords ?? [])
     .filter((record) => record.sessions)
     .map((record) => {
-      const session = record.sessions as unknown as { id: number; name: string; role: string };
+      const session = record.sessions as unknown as { id: number; name: string; role: string; is_archived: boolean };
       return {
         attendance_id: record.id,
         date: record.attendance_date,
@@ -77,6 +79,7 @@ export async function GET() {
         role: session.role,
         location: record.location,
         session_status: record.session_status,
+        is_archived: session.is_archived,
       };
     });
 

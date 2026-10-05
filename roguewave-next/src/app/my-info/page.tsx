@@ -10,6 +10,7 @@ type CoachingHistoryRecord = {
   role: string;
   location: string | null;
   session_status: string;
+  is_archived?: boolean;
 };
 
 type Session = {
@@ -240,6 +241,9 @@ export default function MyInfoPage() {
 
                     <div>
                       <strong>{record.session_name}</strong>
+                      {record.is_archived && (
+                        <span style={archivedBadgeStyle}>Archived</span>
+                      )}
                       {record.location && (
                         <p style={recordRoleStyle}>{record.location}</p>
                       )}
@@ -547,6 +551,18 @@ const cancelledBadgeStyle = {
   textAlign: "center" as const,
   backgroundColor: "var(--danger-background)",
   color: "var(--danger-text)",
+};
+
+const archivedBadgeStyle = {
+  display: "inline-block",
+  marginLeft: "8px",
+  padding: "3px 8px",
+  borderRadius: "20px",
+  fontSize: "11px",
+  fontWeight: "bold",
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
+  border: "1px solid var(--border)",
 };
 
 const emptyStyle = {
