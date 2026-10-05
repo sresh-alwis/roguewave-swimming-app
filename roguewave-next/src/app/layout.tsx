@@ -17,9 +17,28 @@ export const metadata: Metadata = {
   description: "RogueWave Swimming Coaching Management",
 };
 
+const themeInitScript = `
+(function() {
+  try {
+    var saved = localStorage.getItem("roguewave-theme");
+    if (saved === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else if (saved === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    } else {
+      var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

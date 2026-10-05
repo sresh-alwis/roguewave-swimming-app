@@ -227,21 +227,25 @@ function HomeContent({
           <div style={summaryCardStyle}>
             <span style={summaryLabelStyle}>Total Swimmers</span>
             <strong style={summaryNumberStyle}>{summary?.total_swimmers ?? 0}</strong>
+            <span style={summaryHelperStyle}>Current swimmers</span>
           </div>
 
           <div style={summaryCardStyle}>
             <span style={summaryLabelStyle}>Total Sessions</span>
             <strong style={summaryNumberStyle}>{summary?.total_sessions ?? 0}</strong>
+            <span style={summaryHelperStyle}>Session definitions</span>
           </div>
 
           <div style={summaryCardStyle}>
             <span style={summaryLabelStyle}>Sessions Completed</span>
             <strong style={summaryNumberStyle}>{summary?.sessions_completed ?? 0}</strong>
+            <span style={summaryHelperStyle}>All-time, excluding cancelled</span>
           </div>
 
           <div style={summaryCardStyle}>
             <span style={summaryLabelStyle}>Upcoming Sessions</span>
             <strong style={summaryNumberStyle}>{summary?.upcoming_sessions ?? 0}</strong>
+            <span style={summaryHelperStyle}>This calendar month</span>
           </div>
         </div>
 
@@ -481,21 +485,14 @@ function HomeContent({
                 )}
               </div>
 
-              {sameDate(new Date(nextSession.date + "T00:00:00"), now) ? (
-                <Link
-                  href={`/attendance/${nextSession.session_id}?date=${nextSession.date}`}
-                >
-                  <button style={buttonStyle}>Mark Attendance</button>
-                </Link>
-              ) : (
-                <button style={disabledButtonStyle} disabled>
-                  Available on{" "}
-                  {new Date(nextSession.date + "T00:00:00").toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                  })}
+              <Link
+                href={`/attendance/${nextSession.session_id}?date=${nextSession.date}`}
+                style={attendanceLinkStyle}
+              >
+                <button style={smallButtonStyle}>
+                  {nextSession.has_attendance ? "View Attendance" : "Mark Attendance"}
                 </button>
-              )}
+              </Link>
             </div>
           )}
         </div>
@@ -629,6 +626,11 @@ const summaryNumberStyle = {
   fontSize: "30px",
 };
 
+const summaryHelperStyle = {
+  color: "var(--secondary-text)",
+  fontSize: "12px",
+};
+
 const largeCardStyle = {
   backgroundColor: "var(--card)",
   padding: "25px",
@@ -644,15 +646,6 @@ const buttonStyle = {
   padding: "10px 18px",
   cursor: "pointer",
   fontWeight: "bold",
-};
-
-const disabledButtonStyle = {
-  backgroundColor: "var(--secondary-button)",
-  color: "var(--secondary-text)",
-  border: "1px solid var(--border)",
-  borderRadius: "6px",
-  padding: "10px 18px",
-  cursor: "not-allowed",
 };
 
 const smallButtonStyle = {
@@ -693,39 +686,39 @@ const monthNavigationStyle = {
 
 const calendarWrapperStyle = {
   width: "100%",
-  overflowX: "auto" as const,
-  paddingBottom: "4px",
 };
 
 const calendarGridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(7, minmax(70px, 1fr))",
-  gap: "8px",
-  minWidth: "560px",
+  gridTemplateColumns: "repeat(7, 1fr)",
+  gap: "6px",
 };
 
 const weekHeadingStyle = {
   textAlign: "center" as const,
   fontWeight: "bold",
-  padding: "8px",
+  padding: "10px",
   color: "var(--secondary-text)",
+  fontSize: "13px",
 };
 
 const emptyDayStyle = {
-  minHeight: "75px",
+  minHeight: "90px",
 };
 
 const calendarDayStyle = {
-  minHeight: "75px",
-  padding: "8px",
+  minHeight: "90px",
+  padding: "10px",
   borderRadius: "8px",
   cursor: "pointer",
   textAlign: "left" as const,
   color: "var(--text)",
+  display: "flex",
+  flexDirection: "column" as const,
 };
 
 const sessionIndicatorStyle = {
-  marginTop: "8px",
+  marginTop: "auto",
   fontSize: "11px",
   color: "var(--accent-text)",
   fontWeight: "bold",
@@ -733,8 +726,10 @@ const sessionIndicatorStyle = {
 
 const selectedDateBoxStyle = {
   marginTop: "25px",
-  paddingTop: "20px",
-  borderTop: "1px solid var(--border)",
+  padding: "20px",
+  backgroundColor: "var(--soft-background)",
+  borderRadius: "8px",
+  border: "1px solid var(--border)",
 };
 
 const informationRowStyle = {

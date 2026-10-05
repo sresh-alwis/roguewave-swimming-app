@@ -83,20 +83,22 @@ export default function SettingsPage() {
     applyTheme(selectedTheme);
   }
 
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!coachName.trim()) {
-      alert("Please enter your name.");
+      setFeedback({ type: "error", message: "Please enter your name." });
       return;
     }
 
     if (!squadName.trim()) {
-      alert("Please enter your squad name.");
+      setFeedback({ type: "error", message: "Please enter your squad name." });
       return;
     }
 
-    alert("Settings saved.");
+    setFeedback({ type: "success", message: "Settings saved." });
   }
 
   return (
@@ -209,6 +211,19 @@ export default function SettingsPage() {
               System Default follows your phone or computer appearance setting.
             </p>
           </div>
+
+          {/* Feedback */}
+          {feedback && (
+            <div
+              style={
+                feedback.type === "success"
+                  ? feedbackSuccessStyle
+                  : feedbackErrorStyle
+              }
+            >
+              {feedback.message}
+            </div>
+          )}
 
           {/* Actions */}
           <div style={buttonRowStyle}>
@@ -334,5 +349,23 @@ const buttonStyle = {
   borderRadius: "6px",
   padding: "10px 20px",
   cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const feedbackSuccessStyle = {
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
+};
+
+const feedbackErrorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
   fontWeight: "bold",
 };

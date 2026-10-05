@@ -124,6 +124,7 @@ function AttendanceContent({
     useState<ApiAttendanceRecord | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const attendanceRequestKey = useRef<string | null>(null);
 
@@ -314,17 +315,17 @@ function AttendanceContent({
 
   async function handleSave() {
     if (!selectedDate) {
-      alert("Please select a date.");
+      setFeedback({ type: "error", message: "Please select a date." });
       return;
     }
 
     if (selectedDate > getTodayKey()) {
-      alert("Attendance cannot be marked for a future date.");
+      setFeedback({ type: "error", message: "Attendance cannot be marked for a future date." });
       return;
     }
 
     if (!selectedSchedule && !existingRecord) {
-      alert("This session is not scheduled on the selected date.");
+      setFeedback({ type: "error", message: "This session is not scheduled on the selected date." });
       return;
     }
 
@@ -377,7 +378,7 @@ function AttendanceContent({
         const data = await response.json();
 
         if (!response.ok) {
-          alert(data.error || "Failed to update attendance.");
+          setFeedback({ type: "error", message: data.error || "Failed to update attendance." });
           return;
         }
 
@@ -395,11 +396,11 @@ function AttendanceContent({
             .filter((id): id is number => id !== null),
         );
 
-        alert("Attendance updated.");
+        setFeedback({ type: "success", message: "Attendance updated." });
 
         setEditing(false);
       } catch {
-        alert("Failed to update attendance.");
+        setFeedback({ type: "error", message: "Failed to update attendance." });
       } finally {
         setSaving(false);
       }
@@ -438,7 +439,7 @@ function AttendanceContent({
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Failed to save attendance.");
+        setFeedback({ type: "error", message: data.error || "Failed to save attendance." });
         return;
       }
 
@@ -456,11 +457,11 @@ function AttendanceContent({
           .filter((id): id is number => id !== null),
       );
 
-      alert("Attendance saved.");
+      setFeedback({ type: "success", message: "Attendance saved." });
 
       setEditing(false);
     } catch {
-      alert("Failed to save attendance.");
+      setFeedback({ type: "error", message: "Failed to save attendance." });
     } finally {
       setSaving(false);
     }
@@ -746,6 +747,19 @@ function AttendanceContent({
           </>
         )}
 
+        {/* Feedback */}
+        {feedback && (
+          <div
+            style={
+              feedback.type === "success"
+                ? feedbackSuccessStyle
+                : feedbackErrorStyle
+            }
+          >
+            {feedback.message}
+          </div>
+        )}
+
         {/* Close is ALWAYS visible */}
         <div style={closeRowStyle}>
           <Link href="/attendance" style={closeLinkStyle}>
@@ -993,5 +1007,23 @@ const closeLinkStyle = {
   borderRadius: "6px",
   padding: "10px 20px",
   textDecoration: "none",
+  fontWeight: "bold",
+};
+
+const feedbackSuccessStyle = {
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginTop: "20px",
+  fontWeight: "bold",
+};
+
+const feedbackErrorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginTop: "20px",
   fontWeight: "bold",
 };

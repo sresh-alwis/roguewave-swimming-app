@@ -190,7 +190,7 @@ export default function AttendancePage() {
                       <p style={roleStyle}>{session.role}</p>
                     </div>
 
-                    {session.swimmers > 0 ? (
+                    {session.role === "Head Coach" ? (
                       <span style={swimmerBadgeStyle}>
                         {session.swimmers} swimmers
                       </span>
@@ -241,7 +241,7 @@ export default function AttendancePage() {
 
                   {/* Explanation */}
                   <p style={helperTextStyle}>
-                    {session.swimmers > 0
+                    {session.role === "Head Coach"
                       ? "Mark each swimmer as present or absent."
                       : "Swimmer attendance is not managed for Assistant Coach sessions."}
                   </p>
