@@ -361,6 +361,7 @@ function AttendanceContent({
         if (sessionStatus === "normal" && (!wasNormal || selectionChanged)) {
           body.present_swimmer_ids = presentSwimmers;
         }
+        // Head Coach: no coach_status needed (presence implied by normal session)
       } else {
         body.coach_status = coachStatus;
       }
@@ -414,19 +415,22 @@ function AttendanceContent({
       attendance_date: string;
       location: string;
       session_status: string;
-      coach_status: string | null;
+      coach_status?: string | null;
       present_swimmer_ids?: number[];
     } = {
       session_id: sessionId,
       attendance_date: selectedDate,
       location: attendanceLocation,
       session_status: sessionStatus,
-      coach_status: isHeadCoach ? null : coachStatus,
     };
 
     if (isHeadCoach) {
+      // Head Coach: no coach_status needed (presence implied by normal session)
       body.present_swimmer_ids =
         sessionStatus === "normal" ? presentSwimmers : [];
+    } else {
+      // Assistant Coach: session_status is always "normal"
+      body.coach_status = coachStatus;
     }
 
     try {

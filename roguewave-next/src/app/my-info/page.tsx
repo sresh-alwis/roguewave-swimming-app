@@ -10,6 +10,7 @@ type CoachingHistoryRecord = {
   role: string;
   location: string | null;
   session_status: string;
+  coach_status?: string | null;
   is_archived?: boolean;
 };
 
@@ -32,7 +33,9 @@ type Session = {
 
 type MyInfoData = {
   current_swimmers: number;
-  total_coaching_sessions: number;
+  my_coaching_sessions: number;
+  total_time_coached: string;
+  total_minutes_coached: number;
   sessions: Session[];
   history: CoachingHistoryRecord[];
 };
@@ -166,8 +169,14 @@ export default function MyInfoPage() {
           </div>
 
           <div style={summaryCardStyle}>
-            <span style={summaryLabelStyle}>Total Coaching Sessions</span>
-            <strong style={summaryNumberStyle}>{data.total_coaching_sessions}</strong>
+            <span style={summaryLabelStyle}>My Coaching Sessions</span>
+            <strong style={summaryNumberStyle}>{data.my_coaching_sessions}</strong>
+            <span style={allTimeLabelStyle}>Normal + Coach Present</span>
+          </div>
+
+          <div style={summaryCardStyle}>
+            <span style={summaryLabelStyle}>Total Time Coached</span>
+            <strong style={summaryNumberStyle}>{data.total_time_coached}</strong>
             <span style={allTimeLabelStyle}>All Time</span>
           </div>
         </div>
@@ -255,10 +264,28 @@ export default function MyInfoPage() {
                       style={
                         record.session_status === "cancelled"
                           ? cancelledBadgeStyle
-                          : completedBadgeStyle
+                          : record.session_status === "no_session"
+                            ? noSessionBadgeStyle
+                            : record.session_status === "holiday"
+                              ? holidayBadgeStyle
+                              : record.coach_status === "present"
+                                ? completedBadgeStyle
+                                : record.coach_status === "absent"
+                                  ? coachAbsentBadgeStyle
+                                  : completedBadgeStyle
                       }
                     >
-                      {record.session_status === "cancelled" ? "Cancelled" : "Completed"}
+                      {record.session_status === "cancelled"
+                        ? "Cancelled"
+                        : record.session_status === "no_session"
+                          ? "No Session"
+                          : record.session_status === "holiday"
+                            ? "Holiday"
+                            : record.coach_status === "present"
+                              ? "Normal | Coach Present"
+                              : record.coach_status === "absent"
+                                ? "Normal | Coach Absent"
+                                : "Normal"}
                     </span>
                   </div>
                 ))}
@@ -551,6 +578,41 @@ const cancelledBadgeStyle = {
   textAlign: "center" as const,
   backgroundColor: "var(--danger-background)",
   color: "var(--danger-text)",
+};
+
+const noSessionBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textAlign: "center" as const,
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
+  border: "1px solid var(--border)",
+};
+
+const holidayBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textAlign: "center" as const,
+  backgroundColor: "var(--accent-background)",
+  color: "var(--accent-text)",
+};
+
+const coachAbsentBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textAlign: "center" as const,
+  backgroundColor: "var(--warning-background, #fff3cd)",
+  color: "var(--warning-text, #856404)",
+  border: "1px solid var(--border)",
 };
 
 const archivedBadgeStyle = {

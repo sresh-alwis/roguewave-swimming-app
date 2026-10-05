@@ -78,11 +78,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: attendanceError.message }, { status: 500 });
   }
 
-  // Get all-time non-cancelled attendance count for sessions_completed
+  // Get all-time normal-only attendance count for sessions_completed
+  // Sessions Completed = session_status === "normal" (operational occurrence statistic)
+  // Does NOT depend on coach_status
   const { count: sessionsCompleted, error: completedError } = await supabaseServer
     .from("attendance_records")
     .select("*", { count: "exact", head: true })
-    .neq("session_status", "cancelled");
+    .eq("session_status", "normal");
 
   if (completedError) {
     return NextResponse.json({ error: completedError.message }, { status: 500 });

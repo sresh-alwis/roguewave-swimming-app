@@ -231,14 +231,31 @@ export async function PATCH(
     }
 
     if (isHeadCoach) {
-      finalCoachStatus = null;
+      // Head Coach: no manual coach_status needed
+      // Presence is implied by normal session status
       if (session_status !== undefined) {
         finalSessionStatus = session_status;
       }
+      // For normal sessions, persist coach_status as "present" for consistency
+      // For cancelled/no_session/holiday, coach_status is null (not applicable)
+      if (finalSessionStatus === "normal") {
+        finalCoachStatus = "present";
+      } else {
+        finalCoachStatus = null;
+      }
     } else {
-      finalSessionStatus = "normal";
-      if (coach_status !== undefined) {
-        finalCoachStatus = coach_status;
+      // Assistant Coach: session_status can be normal/cancelled/no_session/holiday
+      if (session_status !== undefined) {
+        finalSessionStatus = session_status;
+      }
+      // coach_status applies only for normal sessions
+      // For cancelled/no_session/holiday, coach_status is null (not applicable)
+      if (finalSessionStatus === "normal") {
+        if (coach_status !== undefined) {
+          finalCoachStatus = coach_status;
+        }
+      } else {
+        finalCoachStatus = null;
       }
     }
 

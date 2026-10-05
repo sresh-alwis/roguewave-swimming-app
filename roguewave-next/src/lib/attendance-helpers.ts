@@ -169,6 +169,67 @@ export function buildRestoreRows(
 }
 
 /* =========================
+   DURATION CALCULATION
+   ========================= */
+
+/**
+ * Calculate duration in minutes between two time strings (HH:MM format).
+ * Returns null if times are malformed or missing.
+ * Handles normal same-day sessions safely.
+ */
+export function calculateDurationMinutes(
+  startTime: string | null | undefined,
+  endTime: string | null | undefined,
+): number | null {
+  if (!startTime || !endTime) return null;
+
+  const startMatch = startTime.match(/^(\d{1,2}):(\d{2})$/);
+  const endMatch = endTime.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!startMatch || !endMatch) return null;
+
+  const startHour = parseInt(startMatch[1], 10);
+  const startMinute = parseInt(startMatch[2], 10);
+  const endHour = parseInt(endMatch[1], 10);
+  const endMinute = parseInt(endMatch[2], 10);
+
+  if (
+    startHour < 0 || startHour > 23 ||
+    endHour < 0 || endHour > 23 ||
+    startMinute < 0 || startMinute > 59 ||
+    endMinute < 0 || endMinute > 59
+  ) {
+    return null;
+  }
+
+  const startTotal = startHour * 60 + startMinute;
+  const endTotal = endHour * 60 + endMinute;
+
+  // Handle sessions that cross midnight (e.g., 23:00 - 01:00)
+  if (endTotal < startTotal) {
+    return (24 * 60 - startTotal) + endTotal;
+  }
+
+  return endTotal - startTotal;
+}
+
+/**
+ * Format minutes into a human-readable duration string.
+ * Examples: 60 -> "1h 0m", 90 -> "1h 30m", 45 -> "45m"
+ */
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${mins}m`;
+}
+
+/* =========================
    ATTENDANCE SUMMARY CALCULATION
    ========================= */
 

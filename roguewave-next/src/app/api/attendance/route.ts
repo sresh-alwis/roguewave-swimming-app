@@ -286,8 +286,18 @@ export async function POST(request: Request) {
     let finalSessionStatus: string = session_status;
 
     if (isHeadCoach) {
-      finalCoachStatus = null;
+      // Head Coach: no manual coach_status needed
+      // Presence is implied by normal session status
+      // For normal sessions, persist coach_status as "present" for consistency
+      // For cancelled/no_session/holiday, coach_status is null (not applicable)
+      if (session_status === "normal") {
+        finalCoachStatus = "present";
+      } else {
+        finalCoachStatus = null;
+      }
     } else {
+      // Assistant Coach: session_status is always "normal"
+      // coach_status can be present/absent/cancelled/no_session/holiday
       finalCoachStatus = coach_status;
       finalSessionStatus = "normal";
     }

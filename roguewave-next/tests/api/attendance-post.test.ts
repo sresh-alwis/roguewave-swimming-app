@@ -88,7 +88,8 @@ describe("POST /api/attendance", () => {
     expect(data.record).toBeDefined();
     expect(data.record.session_id).toBe(10);
     expect(data.record.session_status).toBe("normal");
-    expect(data.record.coach_status).toBeNull();
+    // Head Coach normal sessions now have coach_status (defaults to "present")
+    expect(data.record.coach_status).toBe("present");
   });
 
   it("creates correct present/absent swimmer rows", async () => {

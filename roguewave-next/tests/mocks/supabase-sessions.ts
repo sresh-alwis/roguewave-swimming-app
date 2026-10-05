@@ -61,6 +61,7 @@ export function createSessionsQueryBuilder(
   state: MockSessionsState,
 ) {
   const filters: Filter[] = [];
+  const orConditions: string[] = [];
   let pendingInsert: any = null;
   let pendingUpdate: any = null;
   let isDelete = false;
@@ -165,8 +166,34 @@ export function createSessionsQueryBuilder(
             filters.push({ column: col, value: val, operator: "lte" });
             return headBuilder;
           },
+          or(condition: string) {
+            orConditions.push(condition);
+            return headBuilder;
+          },
           then(resolve: any, reject: any) {
-            const filtered = applyFilters();
+            let filtered = applyFilters();
+            // Apply OR conditions if present
+            if (orConditions.length > 0) {
+              const orConditionsParsed = orConditions.flatMap((cond) =>
+                cond.split(",").map((c) => {
+                  const match = c.match(/(\w+)\.eq\.(.+)/);
+                  if (match) {
+                    return { column: match[1], value: match[2].trim() };
+                  }
+                  return null;
+                }).filter(Boolean)
+              );
+              filtered = filtered.filter((row) => {
+                return orConditionsParsed.some((cond) => {
+                  if (!cond) return false;
+                  if (cond.column === "role") {
+                    const session = state.sessions.find((s) => s.id === row.session_id);
+                    return session && session.role === cond.value;
+                  }
+                  return row[cond.column] === cond.value;
+                });
+              });
+            }
             return Promise.resolve({ count: filtered.length, error: null }).then(resolve, reject);
           },
         };
@@ -207,6 +234,15 @@ export function createSessionsQueryBuilder(
     },
     in(column: string, values: any[]) {
       filters.push({ column, value: values });
+      return builder;
+    },
+    or(condition: string) {
+      // Parse simple OR conditions like "coach_status.eq.present,sessions.role.eq.Head Coach"
+      // For the my-info query, we need to count records where:
+      // - coach_status = "present" OR
+      // - related session role = "Head Coach"
+      // Store the OR condition for later evaluation in execute()
+      orConditions.push(condition);
       return builder;
     },
     order() {
@@ -324,14 +360,28 @@ export function createSessionsQueryBuilder(
     // Handle select
     if (isSelect) {
       // Handle attendance_records with nested sessions (for coaching history / my-info)
+      // This check must come before the generic nestedSelect handling because
+ // the my-info select string starts with column names, not a table name.
+      // Only handle when the select string contains "sessions (" to avoid
+      // interfering with other attendance_records queries.
       if (table === "attendance_records" && lastSelectArg?.includes("sessions (")) {
         const hydrated = results.map((row) => {
           const session = state.sessions.find(
             (s) => s.id === row.session_id,
           );
+          if (!session) {
+            return { ...row, sessions: null };
+          }
+          // Hydrate session_schedules for the nested session
+          const sessionSchedules = state.session_schedules.filter(
+            (s) => s.session_id === session.id,
+          );
           return {
             ...row,
-            sessions: session || null,
+            sessions: {
+              ...session,
+              session_schedules: sessionSchedules,
+            },
           };
         });
 
@@ -412,9 +462,19 @@ export function createSessionsQueryBuilder(
           const session = state.sessions.find(
             (s) => s.id === row.session_id,
           );
+          if (!session) {
+            return { ...row, sessions: null };
+          }
+          // Hydrate session_schedules for the nested session
+          const sessionSchedules = state.session_schedules.filter(
+            (s) => s.session_id === session.id,
+          );
           return {
             ...row,
-            sessions: session || null,
+            sessions: {
+              ...session,
+              session_schedules: sessionSchedules,
+            },
           };
         });
 
