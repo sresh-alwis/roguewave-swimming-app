@@ -42,6 +42,9 @@ type ApiSession = {
     end_time: string;
   }[];
   swimmers: Swimmer[];
+  session_swimmers: {
+    swimmers: Swimmer | null;
+  }[];
 };
 
 type SessionStatus = "normal" | "cancelled" | "no-session" | "holiday";
@@ -153,7 +156,10 @@ function AttendanceContent({
             startTime: s.start_time,
             endTime: s.end_time,
           })),
-          swimmers: apiSession.swimmers || [],
+          swimmers:
+            (apiSession.session_swimmers || [])
+              .map((item) => item.swimmers)
+              .filter((swimmer): swimmer is Swimmer => swimmer !== null),
           date: apiSession.session_date || undefined,
           startTime: apiSession.start_time || undefined,
           endTime: apiSession.end_time || undefined,

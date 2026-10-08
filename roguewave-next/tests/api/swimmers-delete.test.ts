@@ -112,7 +112,7 @@ describe("DELETE /api/swimmers/[id]", () => {
     expect(bobAssignments[0].session_id).toBe(1);
   });
 
-  it("5. attendance_swimmers rows are NOT deleted", async () => {
+  it("5. swimmer with attendance history cannot be deleted (409)", async () => {
     mockState.swimmers = [
       { id: 1, name: "Alice", level: "Beginner" },
     ];
@@ -124,49 +124,57 @@ describe("DELETE /api/swimmers/[id]", () => {
       method: "DELETE",
     });
 
-    await DELETE_SWIMMER(request, {
+    const response = await DELETE_SWIMMER(request, {
       params: Promise.resolve({ id: "1" }),
     });
 
+    expect(response.status).toBe(409);
+    const data = await response.json();
+    expect(data.error).toBe("This swimmer has attendance history and cannot be deleted.");
+    // Swimmer still exists
+    expect(mockState.swimmers.find((s) => s.id === 1)).toBeDefined();
+    // attendance_swimmers rows are NOT deleted
     expect(mockState.attendance_swimmers).toHaveLength(1);
   });
 
-  it("6. attendance_swimmers.swimmer_id becomes null (SET NULL)", async () => {
+  it("6. swimmer without attendance history can be deleted", async () => {
     mockState.swimmers = [
       { id: 1, name: "Alice", level: "Beginner" },
-    ];
-    mockState.attendance_swimmers = [
-      { id: 100, attendance_id: 1, swimmer_id: 1, swimmer_name: "Alice", attendance_status: "present" },
     ];
 
     const request = new Request("http://localhost/api/swimmers/1", {
       method: "DELETE",
     });
 
-    await DELETE_SWIMMER(request, {
+    const response = await DELETE_SWIMMER(request, {
       params: Promise.resolve({ id: "1" }),
     });
 
-    expect(mockState.attendance_swimmers[0].swimmer_id).toBeNull();
+    expect(response.status).toBe(200);
+    expect(mockState.swimmers.find((s) => s.id === 1)).toBeUndefined();
   });
 
-  it("7. swimmer_name remains unchanged after deletion", async () => {
+  it("7. swimmer without attendance history — session_swimmers removed (CASCADE)", async () => {
     mockState.swimmers = [
       { id: 1, name: "Alice", level: "Beginner" },
     ];
-    mockState.attendance_swimmers = [
-      { id: 100, attendance_id: 1, swimmer_id: 1, swimmer_name: "Alice", attendance_status: "present" },
+    mockState.session_swimmers = [
+      { session_id: 1, swimmer_id: 1 },
     ];
 
     const request = new Request("http://localhost/api/swimmers/1", {
       method: "DELETE",
     });
 
-    await DELETE_SWIMMER(request, {
+    const response = await DELETE_SWIMMER(request, {
       params: Promise.resolve({ id: "1" }),
     });
 
-    expect(mockState.attendance_swimmers[0].swimmer_name).toBe("Alice");
+    expect(response.status).toBe(200);
+    const remaining = mockState.session_swimmers.filter(
+      (ss) => ss.swimmer_id === 1,
+    );
+    expect(remaining).toHaveLength(0);
   });
 
   it("8. Unrelated attendance_swimmers rows remain untouched", async () => {
@@ -175,7 +183,6 @@ describe("DELETE /api/swimmers/[id]", () => {
       { id: 2, name: "Bob", level: "Intermediate" },
     ];
     mockState.attendance_swimmers = [
-      { id: 100, attendance_id: 1, swimmer_id: 1, swimmer_name: "Alice", attendance_status: "present" },
       { id: 101, attendance_id: 1, swimmer_id: 2, swimmer_name: "Bob", attendance_status: "absent" },
     ];
 
@@ -183,9 +190,12 @@ describe("DELETE /api/swimmers/[id]", () => {
       method: "DELETE",
     });
 
-    await DELETE_SWIMMER(request, {
+    const response = await DELETE_SWIMMER(request, {
       params: Promise.resolve({ id: "1" }),
     });
+
+    // Alice has no attendance history, so delete succeeds
+    expect(response.status).toBe(200);
 
     const bobRow = mockState.attendance_swimmers.find((a) => a.id === 101);
     expect(bobRow).toBeDefined();

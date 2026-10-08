@@ -10,6 +10,7 @@ type Swimmer = {
   name: string;
   sessionsCompleted: number;
   level: Level;
+  is_archived?: boolean;
 };
 
 type ApiSwimmer = {
@@ -20,6 +21,7 @@ type ApiSwimmer = {
   weight_kg: number | null;
   notes: string | null;
   created_at: string;
+  is_archived?: boolean;
   sessionsCompleted?: number;
 };
 
@@ -32,10 +34,19 @@ export default function SwimmersPage() {
 
   const [error, setError] = useState("");
 
+  const [view, setView] = useState<"active" | "archived">("active");
+
+  const [archivingId, setArchivingId] = useState<number | null>(null);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
+
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   useEffect(() => {
     async function loadSwimmers() {
       try {
-        const response = await fetch("/api/swimmers", {
+        const endpoint =
+          view === "archived" ? "/api/swimmers?archived=true" : "/api/swimmers";
+        const response = await fetch(endpoint, {
           cache: "no-store",
         });
 
@@ -54,6 +65,8 @@ export default function SwimmersPage() {
             level: getLevel(swimmer.level),
 
             sessionsCompleted: swimmer.sessionsCompleted ?? 0,
+
+            is_archived: swimmer.is_archived,
           }),
         );
 
@@ -68,11 +81,79 @@ export default function SwimmersPage() {
     }
 
     loadSwimmers();
-  }, []);
+  }, [view]);
 
   const filteredSwimmers = swimmers.filter((swimmer) =>
     swimmer.name.toLowerCase().includes(search.toLowerCase().trim()),
   );
+
+  async function archiveSwimmer(id: number, name: string) {
+    const confirmed = window.confirm(
+      `Archive "${name}"? They will no longer appear in the active swimmers list or be assignable to sessions. Their attendance history will be kept.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setArchivingId(id);
+
+      const response = await fetch(`/api/swimmers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to archive swimmer.");
+      }
+
+      setSwimmers((current) => current.filter((s) => s.id !== id));
+      setFeedback({ type: "success", message: "Swimmer archived successfully." });
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to archive swimmer.",
+      });
+    } finally {
+      setArchivingId(null);
+    }
+  }
+
+  async function restoreSwimmer(id: number, name: string) {
+    const confirmed = window.confirm(
+      `Restore "${name}"? They will become active and can be assigned to sessions again.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setRestoringId(id);
+
+      const response = await fetch(`/api/swimmers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: false }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to restore swimmer.");
+      }
+
+      setSwimmers((current) => current.filter((s) => s.id !== id));
+      setFeedback({ type: "success", message: "Swimmer restored successfully." });
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to restore swimmer.",
+      });
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   return (
     <main style={pageStyle}>
@@ -141,6 +222,41 @@ export default function SwimmersPage() {
           </Link>
         </div>
 
+        {/* View Tabs */}
+        <div style={tabContainerStyle}>
+          <button
+            style={{
+              ...tabStyle,
+              ...(view === "active" ? activeTabStyle : {}),
+            }}
+            onClick={() => setView("active")}
+          >
+            Active
+          </button>
+          <button
+            style={{
+              ...tabStyle,
+              ...(view === "archived" ? activeTabStyle : {}),
+            }}
+            onClick={() => setView("archived")}
+          >
+            Archived
+          </button>
+        </div>
+
+        {/* Feedback */}
+        {feedback && (
+          <div
+            style={
+              feedback.type === "success"
+                ? feedbackSuccessStyle
+                : feedbackErrorStyle
+            }
+          >
+            {feedback.message}
+          </div>
+        )}
+
         {/* Search */}
 
         <div style={toolbarStyle}>
@@ -191,13 +307,18 @@ export default function SwimmersPage() {
               {filteredSwimmers.map((swimmer) => (
                 <div key={swimmer.id} style={cardStyle}>
                   <div>
-                    <h2
-                      style={{
-                        margin: "0 0 8px 0",
-                      }}
-                    >
-                      {swimmer.name}
-                    </h2>
+                    <div style={cardHeaderStyle}>
+                      <h2
+                        style={{
+                          margin: 0,
+                        }}
+                      >
+                        {swimmer.name}
+                      </h2>
+                      {swimmer.is_archived && (
+                        <span style={archivedBadgeStyle}>Archived</span>
+                      )}
+                    </div>
 
                     <span style={levelBadgeStyle}>{swimmer.level}</span>
                   </div>
@@ -210,12 +331,40 @@ export default function SwimmersPage() {
                     </strong>
                   </div>
 
-                  <Link
-                    href={`/swimmers/${swimmer.id}`}
-                    style={profileLinkStyle}
-                  >
-                    <button style={profileButtonStyle}>View Profile</button>
-                  </Link>
+                  <div style={cardActionsStyle}>
+                    <Link
+                      href={`/swimmers/${swimmer.id}`}
+                      style={profileLinkStyle}
+                    >
+                      <button style={profileButtonStyle}>View Profile</button>
+                    </Link>
+
+                    {view === "active" ? (
+                      <button
+                        style={{
+                          ...archiveButtonStyle,
+                          opacity: archivingId === swimmer.id ? 0.6 : 1,
+                          cursor: archivingId === swimmer.id ? "not-allowed" : "pointer",
+                        }}
+                        disabled={archivingId === swimmer.id}
+                        onClick={() => archiveSwimmer(swimmer.id, swimmer.name)}
+                      >
+                        {archivingId === swimmer.id ? "Archiving..." : "Archive"}
+                      </button>
+                    ) : (
+                      <button
+                        style={{
+                          ...restoreButtonStyle,
+                          opacity: restoringId === swimmer.id ? 0.6 : 1,
+                          cursor: restoringId === swimmer.id ? "not-allowed" : "pointer",
+                        }}
+                        disabled={restoringId === swimmer.id}
+                        onClick={() => restoreSwimmer(swimmer.id, swimmer.name)}
+                      >
+                        {restoringId === swimmer.id ? "Restoring..." : "Restore"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -226,13 +375,19 @@ export default function SwimmersPage() {
                   marginTop: 0,
                 }}
               >
-                {search.trim() ? "No swimmers found" : "No swimmers yet"}
+                {search.trim()
+                  ? "No swimmers found"
+                  : view === "archived"
+                    ? "No archived swimmers"
+                    : "No swimmers yet"}
               </h3>
 
               <p style={subtitleStyle}>
                 {search.trim()
                   ? "Try another name."
-                  : "Add your first swimmer to get started."}
+                  : view === "archived"
+                    ? "Archived swimmers will appear here."
+                    : "Add your first swimmer to get started."}
               </p>
             </div>
           ))}
@@ -302,12 +457,35 @@ const topStyle = {
   alignItems: "center",
   gap: "20px",
   flexWrap: "wrap" as const,
-  marginBottom: "30px",
+  marginBottom: "20px",
 };
 
 const subtitleStyle = {
   color: "var(--secondary-text)",
   margin: "6px 0 0 0",
+};
+
+const tabContainerStyle = {
+  display: "flex",
+  gap: "8px",
+  marginBottom: "25px",
+};
+
+const tabStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
+  padding: "8px 20px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
+const activeTabStyle = {
+  backgroundColor: "var(--button)",
+  color: "var(--button-text)",
+  border: "1px solid var(--button)",
 };
 
 const toolbarStyle = {
@@ -351,6 +529,23 @@ const cardStyle = {
   gap: "22px",
 };
 
+const cardHeaderStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap" as const,
+};
+
+const archivedBadgeStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
+  fontSize: "12px",
+  fontWeight: "bold",
+  padding: "4px 8px",
+  borderRadius: "20px",
+  border: "1px solid var(--border)",
+};
+
 const levelBadgeStyle = {
   display: "inline-block",
   backgroundColor: "var(--accent-background)",
@@ -376,6 +571,12 @@ const sessionNumberStyle = {
   fontSize: "26px",
 };
 
+const cardActionsStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "8px",
+};
+
 const profileLinkStyle = {
   width: "100%",
 };
@@ -395,6 +596,19 @@ const profileButtonStyle = {
   width: "100%",
 };
 
+const archiveButtonStyle = {
+  ...buttonStyle,
+  width: "100%",
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+};
+
+const restoreButtonStyle = {
+  ...buttonStyle,
+  width: "100%",
+};
+
 const emptyStyle = {
   backgroundColor: "var(--card)",
   color: "var(--text)",
@@ -407,4 +621,22 @@ const emptyStyle = {
 const errorStyle = {
   ...emptyStyle,
   border: "1px solid var(--danger)",
+};
+
+const feedbackSuccessStyle = {
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
+};
+
+const feedbackErrorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
 };

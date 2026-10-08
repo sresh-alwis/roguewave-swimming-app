@@ -8,10 +8,15 @@ const validLevels = ["Beginner", "Intermediate", "Advanced"];
    GET ALL SWIMMERS
 ========================= */
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const archivedParam = searchParams.get("archived");
+  const showArchived = archivedParam === "true";
+
   const { data, error } = await supabaseServer
     .from("swimmers")
     .select("*")
+    .eq("is_archived", showArchived)
     .order("id", {
       ascending: true,
     });

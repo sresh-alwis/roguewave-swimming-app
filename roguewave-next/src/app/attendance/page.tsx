@@ -38,7 +38,9 @@ type ApiSession = {
   start_time: string | null;
   end_time: string | null;
   session_schedules: ApiSchedule[];
-  swimmers: { id: number; name: string; level: string }[];
+  session_swimmers: {
+    swimmers: { id: number; name: string; level: string } | null;
+  }[];
 };
 
 export default function AttendancePage() {
@@ -64,7 +66,13 @@ export default function AttendancePage() {
             id: session.id,
             name: session.name,
             role: session.role,
-            swimmers: session.swimmers?.length || 0,
+            swimmers:
+              (session.session_swimmers || [])
+                .map((item) => item.swimmers)
+                .filter(
+                  (swimmer): swimmer is { id: number; name: string; level: string } =>
+                    swimmer !== null,
+                ).length,
             schedules: (session.session_schedules || [])
               .sort((a, b) => a.day_of_week - b.day_of_week)
               .map((schedule) => ({
@@ -115,6 +123,10 @@ export default function AttendancePage() {
             Swimmers
           </Link>
 
+          <Link href="/sessions" style={linkStyle}>
+            Sessions
+          </Link>
+
           <Link
             href="/attendance"
             style={{
@@ -123,10 +135,6 @@ export default function AttendancePage() {
             }}
           >
             Attendance
-          </Link>
-
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
           </Link>
 
           <Link href="/my-info" style={linkStyle}>

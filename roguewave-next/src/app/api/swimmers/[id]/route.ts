@@ -133,6 +133,7 @@ export async function GET(
   return NextResponse.json({
     ...enrichedData,
     sessionsCompleted: summary.sessions_completed,
+    has_attendance_history: (attendanceRows ?? []).length > 0,
   });
 }
 
@@ -170,7 +171,56 @@ export async function PATCH(
       height_cm,
       weight_kg,
       notes,
+      is_archived,
     } = body;
+
+    // Archive/Restore mode
+    if (typeof is_archived === "boolean") {
+      const { data: swimmer, error } = await supabaseServer
+        .from("swimmers")
+        .update({ is_archived })
+        .eq("id", swimmerId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        return NextResponse.json(
+          {
+            error: error.message,
+          },
+          {
+            status: 500,
+          },
+        );
+      }
+
+      if (!swimmer) {
+        return NextResponse.json(
+          {
+            error: "Swimmer not found.",
+          },
+          {
+            status: 404,
+          },
+        );
+      }
+
+      // If archiving, remove session_swimmers links to avoid stale active assignments
+      if (is_archived) {
+        await supabaseServer
+          .from("session_swimmers")
+          .delete()
+          .eq("swimmer_id", swimmerId);
+      }
+
+      return NextResponse.json({
+        message: is_archived
+          ? "Swimmer archived successfully."
+          : "Swimmer restored successfully.",
+
+        swimmer,
+      });
+    }
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -326,6 +376,34 @@ export async function DELETE(
       },
       {
         status: 400,
+      },
+    );
+  }
+
+  // Check for attendance history before allowing delete
+  const { count: attendanceCount, error: attendanceError } = await supabaseServer
+    .from("attendance_swimmers")
+    .select("*", { count: "exact", head: true })
+    .eq("swimmer_id", swimmerId);
+
+  if (attendanceError) {
+    return NextResponse.json(
+      {
+        error: attendanceError.message,
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+
+  if (attendanceCount !== null && attendanceCount > 0) {
+    return NextResponse.json(
+      {
+        error: "This swimmer has attendance history and cannot be deleted.",
+      },
+      {
+        status: 409,
       },
     );
   }

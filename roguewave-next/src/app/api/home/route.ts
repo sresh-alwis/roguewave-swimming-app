@@ -53,10 +53,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: sessionsError.message }, { status: 500 });
   }
 
-  // Get total swimmer count
+  // Get total swimmer count (active only)
   const { count: totalSwimmers, error: swimmersError } = await supabaseServer
     .from("swimmers")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("is_archived", false);
 
   if (swimmersError) {
     return NextResponse.json({ error: swimmersError.message }, { status: 500 });

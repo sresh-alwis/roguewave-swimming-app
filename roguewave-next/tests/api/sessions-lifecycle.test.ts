@@ -3,6 +3,7 @@ import { GET as GET_SESSIONS } from "@/app/api/sessions/route";
 import { GET as GET_SESSION, PATCH as PATCH_SESSION, DELETE as DELETE_SESSION } from "@/app/api/sessions/[id]/route";
 import { GET as GET_HOME } from "@/app/api/home/route";
 import { generateCalendarOccurrences } from "@/lib/calendar-helpers";
+import { getColomboToday } from "@/lib/attendance-helpers";
 
 import {
   createMockSessionsState,
@@ -268,10 +269,10 @@ describe("V1 Session Lifecycle", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    // upcoming_sessions should only count active session occurrences
-    // Both sessions are on Monday, but only active should be counted
+    // upcoming_sessions should only count active session occurrences (today or future)
+    const todayStr = getColomboToday();
     const activeMondayCount = data.calendar.filter(
-      (occ: { name: string }) => occ.name === "Active Session",
+      (occ: { name: string; date: string }) => occ.name === "Active Session" && occ.date >= todayStr,
     ).length;
     expect(data.summary.upcoming_sessions).toBe(activeMondayCount);
   });

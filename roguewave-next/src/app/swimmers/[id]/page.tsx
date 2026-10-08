@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 type ApiSession = {
   id: number;
@@ -31,8 +31,10 @@ type ApiSwimmer = {
   weight_kg: number | null;
   notes: string | null;
   created_at: string;
+  is_archived?: boolean;
   sessions: ApiSession[];
   sessionsCompleted: number;
+  has_attendance_history?: boolean;
 };
 
 type Swimmer = {
@@ -46,11 +48,12 @@ type Swimmer = {
   sessionsCompleted: number;
   assignedSessions: ApiSession[];
   extraDetails: string;
+  isArchived: boolean;
+  hasAttendanceHistory: boolean;
 };
 
 export default function SwimmerProfilePage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
 
   const swimmerId = params.id;
 
@@ -60,7 +63,11 @@ export default function SwimmerProfilePage() {
 
   const [error, setError] = useState("");
 
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     async function loadSwimmer() {
@@ -107,6 +114,9 @@ export default function SwimmerProfilePage() {
           assignedSessions: apiSwimmer.sessions || [],
 
           extraDetails: apiSwimmer.notes || "",
+
+          isArchived: apiSwimmer.is_archived ?? false,
+          hasAttendanceHistory: apiSwimmer.has_attendance_history ?? false,
         });
       } catch (err) {
         setError(
@@ -123,14 +133,90 @@ export default function SwimmerProfilePage() {
   }, [swimmerId]);
 
   /* =========================
-     DELETE FUNCTION
-  ========================= */
+     ARCHIVE / RESTORE
+   ========================= */
+
+  async function handleArchiveClick() {
+    if (!swimmer) return;
+
+    const confirmed = window.confirm(
+      `Archive ${swimmer.name}? They will no longer appear in the active swimmers list or be assignable to sessions. Their attendance history will be kept.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsArchiving(true);
+
+      const response = await fetch(`/api/swimmers/${swimmer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to archive swimmer.");
+      }
+
+      setSwimmer((current) =>
+        current ? { ...current, isArchived: true, assignedSessions: [] } : current,
+      );
+      setFeedback({ type: "success", message: "Swimmer archived successfully." });
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to archive swimmer.",
+      });
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
+  async function handleRestoreClick() {
+    if (!swimmer) return;
+
+    const confirmed = window.confirm(
+      `Restore ${swimmer.name}? They will become active and can be assigned to sessions again.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsRestoring(true);
+
+      const response = await fetch(`/api/swimmers/${swimmer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: false }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to restore swimmer.");
+      }
+
+      setSwimmer((current) =>
+        current ? { ...current, isArchived: false } : current,
+      );
+      setFeedback({ type: "success", message: "Swimmer restored successfully." });
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to restore swimmer.",
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  }
 
   async function handleDeleteClick() {
     if (!swimmer) return;
 
     const confirmed = window.confirm(
-      `Delete ${swimmer.name}? This will remove them from all current sessions. Their previous attendance history will be kept. This action cannot be undone.`
+      `Permanently delete ${swimmer.name}? This cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -148,12 +234,14 @@ export default function SwimmerProfilePage() {
         throw new Error(data.error || "Failed to delete swimmer.");
       }
 
-      // Redirect to swimmers list on success
-      router.push("/swimmers");
+      setFeedback({ type: "success", message: "Swimmer deleted successfully." });
+      // Redirect to swimmers list after successful delete
+      window.location.href = "/swimmers";
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to delete swimmer."
-      );
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to delete swimmer.",
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -161,7 +249,7 @@ export default function SwimmerProfilePage() {
 
   /* =========================
      LOADING
-  ========================= */
+   ========================= */
 
   if (loading) {
     return (
@@ -175,7 +263,7 @@ export default function SwimmerProfilePage() {
 
   /* =========================
      ERROR / NOT FOUND
-  ========================= */
+   ========================= */
 
   if (error || !swimmer) {
     return (
@@ -252,24 +340,65 @@ export default function SwimmerProfilePage() {
               </h1>
 
               <span style={levelBadgeStyle}>{swimmer.level}</span>
+
+              {swimmer.isArchived && (
+                <span style={archivedBadgeStyle}>Archived</span>
+              )}
             </div>
 
             <p style={subtitleStyle}>Swimmer Profile</p>
           </div>
 
-          <Link href={`/swimmers/${swimmer.id}/edit`} style={buttonLinkStyle}>
-            Edit Swimmer
-          </Link>
+          <div style={headerActionsStyle}>
+            <Link href={`/swimmers/${swimmer.id}/edit`} style={buttonLinkStyle}>
+              Edit Swimmer
+            </Link>
 
-          <button
-            type="button"
-            onClick={() => handleDeleteClick()}
-            disabled={isDeleting}
-            style={deleteButtonStyle}
-          >
-            {isDeleting ? "Deleting..." : "Delete Swimmer"}
-          </button>
+            {swimmer.isArchived ? (
+              <button
+                type="button"
+                onClick={handleRestoreClick}
+                disabled={isRestoring}
+                style={restoreButtonStyle}
+              >
+                {isRestoring ? "Restoring..." : "Restore Swimmer"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleArchiveClick}
+                disabled={isArchiving}
+                style={archiveButtonStyle}
+              >
+                {isArchiving ? "Archiving..." : "Archive Swimmer"}
+              </button>
+            )}
+
+            {!swimmer.hasAttendanceHistory && (
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                style={deleteButtonStyle}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Feedback */}
+        {feedback && (
+          <div
+            style={
+              feedback.type === "success"
+                ? feedbackSuccessStyle
+                : feedbackErrorStyle
+            }
+          >
+            {feedback.message}
+          </div>
+        )}
 
         {/* Profile Cards */}
 
@@ -330,7 +459,11 @@ export default function SwimmerProfilePage() {
                 ))}
               </div>
             ) : (
-              <p style={mutedTextStyle}>No sessions assigned.</p>
+              <p style={mutedTextStyle}>
+                {swimmer.isArchived
+                  ? "No sessions assigned (swimmer is archived)."
+                  : "No sessions assigned."}
+              </p>
             )}
 
             <Link
@@ -372,7 +505,7 @@ export default function SwimmerProfilePage() {
 
 /* =========================
    COMPONENTS
-========================= */
+   ========================= */
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -386,7 +519,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 /* =========================
    HELPERS
-========================= */
+   ========================= */
 
 function formatDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
@@ -436,7 +569,7 @@ function formatHeight(heightCm: number) {
 
 /* =========================
    STYLES
-========================= */
+   ========================= */
 
 const pageStyle = {
   minHeight: "100vh",
@@ -494,6 +627,13 @@ const topStyle = {
   marginBottom: "30px",
 };
 
+const headerActionsStyle = {
+  display: "flex",
+  gap: "12px",
+  alignItems: "center",
+  flexWrap: "wrap" as const,
+};
+
 const nameRowStyle = {
   display: "flex",
   alignItems: "center",
@@ -513,6 +653,16 @@ const levelBadgeStyle = {
   borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "bold",
+};
+
+const archivedBadgeStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
+  fontSize: "12px",
+  fontWeight: "bold",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  border: "1px solid var(--border)",
 };
 
 const profileGridStyle = {
@@ -587,6 +737,39 @@ const buttonLinkStyle = {
   fontWeight: "bold",
 };
 
+const archiveButtonStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
+  padding: "10px 18px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
+const restoreButtonStyle = {
+  backgroundColor: "var(--button)",
+  color: "var(--button-text)",
+  border: "none",
+  borderRadius: "6px",
+  padding: "10px 18px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
+const deleteButtonStyle = {
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--danger, #dc3545)",
+  border: "1px solid var(--danger, #dc3545)",
+  borderRadius: "6px",
+  padding: "10px 18px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+};
+
 const historyLinkStyle = {
   ...buttonLinkStyle,
   marginTop: "20px",
@@ -610,17 +793,6 @@ const notFoundStyle = {
   padding: "30px",
   border: "1px solid var(--border)",
   borderRadius: "10px",
-};
-
-const deleteButtonStyle = {
-  backgroundColor: "var(--danger)",
-  color: "white",
-  border: "none",
-  borderRadius: "6px",
-  padding: "10px 18px",
-  cursor: "pointer",
-  fontWeight: "bold",
-  fontSize: "14px",
 };
 
 const assignedSessionsListStyle = {
@@ -651,4 +823,22 @@ const assignedSessionLocationStyle = {
   color: "var(--secondary-text)",
   fontSize: "13px",
   marginTop: "2px",
+};
+
+const feedbackSuccessStyle = {
+  backgroundColor: "var(--success-background)",
+  color: "var(--success-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
+};
+
+const feedbackErrorStyle = {
+  backgroundColor: "var(--danger-background)",
+  color: "var(--danger-text)",
+  padding: "14px 18px",
+  borderRadius: "8px",
+  marginBottom: "20px",
+  fontWeight: "bold",
 };

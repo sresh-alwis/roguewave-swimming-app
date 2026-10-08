@@ -268,11 +268,13 @@ export default function MyInfoPage() {
                             ? noSessionBadgeStyle
                             : record.session_status === "holiday"
                               ? holidayBadgeStyle
-                              : record.coach_status === "present"
+                              : record.role === "Head Coach"
                                 ? completedBadgeStyle
-                                : record.coach_status === "absent"
-                                  ? coachAbsentBadgeStyle
-                                  : completedBadgeStyle
+                                : record.coach_status === "present"
+                                  ? completedBadgeStyle
+                                  : record.coach_status === "absent"
+                                    ? coachAbsentBadgeStyle
+                                    : notRecordedBadgeStyle
                       }
                     >
                       {record.session_status === "cancelled"
@@ -281,11 +283,13 @@ export default function MyInfoPage() {
                           ? "No Session"
                           : record.session_status === "holiday"
                             ? "Holiday"
-                            : record.coach_status === "present"
-                              ? "Normal | Coach Present"
-                              : record.coach_status === "absent"
-                                ? "Normal | Coach Absent"
-                                : "Normal"}
+                            : record.role === "Head Coach"
+                              ? "Completed"
+                              : record.coach_status === "present"
+                                ? "Completed"
+                                : record.coach_status === "absent"
+                                  ? "Absent"
+                                  : "Not Recorded"}
                     </span>
                   </div>
                 ))}
@@ -612,6 +616,18 @@ const coachAbsentBadgeStyle = {
   textAlign: "center" as const,
   backgroundColor: "var(--warning-background, #fff3cd)",
   color: "var(--warning-text, #856404)",
+  border: "1px solid var(--border)",
+};
+
+const notRecordedBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textAlign: "center" as const,
+  backgroundColor: "var(--secondary-button)",
+  color: "var(--secondary-text)",
   border: "1px solid var(--border)",
 };
 

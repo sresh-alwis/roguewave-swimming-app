@@ -32,7 +32,8 @@ export async function GET(request?: Request) {
         swimmers (
           id,
           name,
-          level
+          level,
+          is_archived
         )
       )
     `,
@@ -68,9 +69,13 @@ export async function GET(request?: Request) {
     );
   }
 
-  // Add has_attendance flag to each session
+  // Add has_attendance flag to each session and filter archived swimmers
   const sessionsWithAttendance = (data ?? []).map((session) => ({
     ...session,
+    session_swimmers: (session.session_swimmers ?? []).filter(
+      (ss: { swimmers: { is_archived?: boolean } | null }) =>
+        ss.swimmers && !ss.swimmers.is_archived,
+    ),
     has_attendance: attendanceSessionIds.has(session.id),
   }));
 

@@ -4,10 +4,11 @@ import { calculateDurationMinutes, formatDuration } from "@/lib/attendance-helpe
 import type { Session } from "@/lib/attendance-helpers";
 
 export async function GET() {
-  // Get current swimmer count
+  // Get current swimmer count (active only)
   const { count: currentSwimmers, error: swimmersError } = await supabaseServer
     .from("swimmers")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("is_archived", false);
 
   if (swimmersError) {
     return NextResponse.json({ error: swimmersError.message }, { status: 500 });
@@ -17,15 +18,27 @@ export async function GET() {
   // Head Coach: session_status === "normal" (presence implied by normal status)
   // Assistant Coach: session_status === "normal" AND coach_status === "present"
   // This is the coach's personal coaching record
-  const { count: myCoachingSessions, error: sessionsError } = await supabaseServer
+  const { data: coachingRecords, error: sessionsError } = await supabaseServer
     .from("attendance_records")
-    .select("*", { count: "exact", head: true })
-    .eq("session_status", "normal")
-    .or("coach_status.eq.present,sessions.role.eq.Head Coach");
+    .select(`
+      id,
+      session_status,
+      coach_status,
+      sessions (
+        role
+      )
+    `)
+    .eq("session_status", "normal");
 
   if (sessionsError) {
     return NextResponse.json({ error: sessionsError.message }, { status: 500 });
   }
+
+  const myCoachingSessions = (coachingRecords ?? []).filter((record) => {
+    const session = record.sessions as unknown as { role: string } | null;
+    if (!session) return false;
+    return session.role === "Head Coach" || record.coach_status === "present";
+  }).length;
 
   // Get active sessions only for the session list
   const { data: sessions, error: allSessionsError } = await supabaseServer

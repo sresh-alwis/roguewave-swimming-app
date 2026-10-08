@@ -68,12 +68,12 @@ export async function GET(
     return NextResponse.json({ error: sessionSwimmersError.message }, { status: 500 });
   }
 
-  // Transform the data to include swimmers array, filtering out null joins
+  // Transform the data to include swimmers array, filtering out null joins and archived swimmers
   const enrichedData = {
     ...data,
     swimmers: ((sessionSwimmers ?? []) as unknown as SessionSwimmerWithSwimmer[])
       .map((item) => item.swimmers)
-      .filter((swimmer): swimmer is { id: number; name: string; level: string } => swimmer !== null),
+      .filter((swimmer): swimmer is { id: number; name: string; level: string } => swimmer !== null && !(swimmer as unknown as { is_archived?: boolean }).is_archived),
   };
 
   return NextResponse.json(enrichedData);
