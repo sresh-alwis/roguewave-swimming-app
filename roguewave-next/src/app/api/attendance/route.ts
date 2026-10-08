@@ -283,7 +283,7 @@ export async function POST(request: Request) {
     }
 
     let finalCoachStatus: string | null = null;
-    let finalSessionStatus: string = session_status;
+    const finalSessionStatus: string = session_status;
 
     if (isHeadCoach) {
       // Head Coach: no manual coach_status needed
@@ -296,10 +296,13 @@ export async function POST(request: Request) {
         finalCoachStatus = null;
       }
     } else {
-      // Assistant Coach: session_status is always "normal"
-      // coach_status can be present/absent/cancelled/no_session/holiday
-      finalCoachStatus = coach_status;
-      finalSessionStatus = "normal";
+      // Assistant Coach: session_status can be normal/cancelled/no_session/holiday
+      // coach_status applies only for normal sessions
+      if (finalSessionStatus === "normal") {
+        finalCoachStatus = coach_status;
+      } else {
+        finalCoachStatus = null;
+      }
     }
 
     /* -------------------------

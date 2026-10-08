@@ -345,7 +345,7 @@ function AttendanceContent({
       const body: {
         location: string;
         session_status?: string;
-        coach_status?: string;
+        coach_status?: string | null;
         present_swimmer_ids?: number[];
       } = {
         location: attendanceLocation,
@@ -369,7 +369,18 @@ function AttendanceContent({
         }
         // Head Coach: no coach_status needed (presence implied by normal session)
       } else {
-        body.coach_status = coachStatus;
+        // Assistant Coach: map UI selection to session_status + coach_status
+        if (coachStatus === "present" || coachStatus === "absent") {
+          body.session_status = "normal";
+          body.coach_status = coachStatus;
+        } else if (coachStatus === "no-session") {
+          body.session_status = "no_session";
+          body.coach_status = null;
+        } else {
+          // cancelled, holiday
+          body.session_status = coachStatus;
+          body.coach_status = null;
+        }
       }
 
       try {
@@ -435,8 +446,15 @@ function AttendanceContent({
       body.present_swimmer_ids =
         sessionStatus === "normal" ? presentSwimmers : [];
     } else {
-      // Assistant Coach: session_status is always "normal"
-      body.coach_status = coachStatus;
+      // Assistant Coach: map UI selection to session_status + coach_status
+      if (coachStatus === "present" || coachStatus === "absent") {
+        body.session_status = "normal";
+        body.coach_status = coachStatus;
+      } else {
+        // cancelled, no-session, holiday
+        body.session_status = coachStatus;
+        body.coach_status = null;
+      }
     }
 
     try {
