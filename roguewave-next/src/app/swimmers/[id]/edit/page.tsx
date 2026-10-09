@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 type Level = "Beginner" | "Intermediate" | "Advanced";
 
@@ -225,22 +226,24 @@ export default function EditSwimmerPage() {
 
   if (error) {
     return (
-      <main style={pageStyle}>
-        <section style={formCardStyle}>
-          <h1>Swimmer not found</h1>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={formCardStyle}>
+            <h1>Swimmer not found</h1>
 
-          <p style={subtitleStyle}>{error}</p>
+            <p style={subtitleStyle}>{error}</p>
 
-          <Link href="/swimmers" style={buttonLinkStyle}>
-            Back to Swimmers
-          </Link>
-        </section>
-      </main>
+            <Link href="/swimmers" style={buttonLinkStyle}>
+              Back to Swimmers
+            </Link>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
   return (
-    <main style={pageStyle}>
+    <AppShell>
       <section style={formCardStyle}>
         {/* Heading */}
 
@@ -412,7 +415,7 @@ export default function EditSwimmerPage() {
           </div>
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

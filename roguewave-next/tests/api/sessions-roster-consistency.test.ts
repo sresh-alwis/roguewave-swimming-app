@@ -139,33 +139,33 @@ describe("Swimmer Delete UI State", () => {
 });
 
 describe("Navigation Order", () => {
-  it("attendance page has correct navigation order", async () => {
+  it("shared AppShell navigation has correct order", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const pagePath = path.join(process.cwd(), "src/app/attendance/page.tsx");
-    const pageSource = fs.readFileSync(pagePath, "utf-8");
+    const navPath = path.join(process.cwd(), "src/lib/navigation.ts");
+    const navSource = fs.readFileSync(navPath, "utf-8");
 
-    // Find the nav section
-    const navMatch = pageSource.match(/<nav[\s\S]*?<\/nav>/);
-    expect(navMatch).not.toBeNull();
-
-    const navContent = navMatch![0];
-    const homeIdx = navContent.indexOf('href="/home"');
-    const swimmersIdx = navContent.indexOf('href="/swimmers"');
-    const sessionsIdx = navContent.indexOf('href="/sessions"');
-    const attendanceIdx = navContent.indexOf('href="/attendance"');
-    const myInfoIdx = navContent.indexOf('href="/my-info"');
-    const settingsIdx = navContent.indexOf('href="/settings"');
+    // Extract href values in order from navigationItems array
+    const hrefMatches = [...navSource.matchAll(/href:\s*"([^"]+)"/g)].map(
+      (m) => m[1],
+    );
 
     // All links should exist
-    expect(homeIdx).toBeGreaterThan(-1);
-    expect(swimmersIdx).toBeGreaterThan(-1);
-    expect(sessionsIdx).toBeGreaterThan(-1);
-    expect(attendanceIdx).toBeGreaterThan(-1);
-    expect(myInfoIdx).toBeGreaterThan(-1);
-    expect(settingsIdx).toBeGreaterThan(-1);
+    expect(hrefMatches).toContain("/home");
+    expect(hrefMatches).toContain("/swimmers");
+    expect(hrefMatches).toContain("/sessions");
+    expect(hrefMatches).toContain("/attendance");
+    expect(hrefMatches).toContain("/my-info");
+    expect(hrefMatches).toContain("/settings");
 
     // Order: Home < Swimmers < Sessions < Attendance < My Info < Settings
+    const homeIdx = hrefMatches.indexOf("/home");
+    const swimmersIdx = hrefMatches.indexOf("/swimmers");
+    const sessionsIdx = hrefMatches.indexOf("/sessions");
+    const attendanceIdx = hrefMatches.indexOf("/attendance");
+    const myInfoIdx = hrefMatches.indexOf("/my-info");
+    const settingsIdx = hrefMatches.indexOf("/settings");
+
     expect(homeIdx).toBeLessThan(swimmersIdx);
     expect(swimmersIdx).toBeLessThan(sessionsIdx);
     expect(sessionsIdx).toBeLessThan(attendanceIdx);

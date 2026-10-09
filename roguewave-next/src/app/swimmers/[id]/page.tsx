@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 type ApiSession = {
   id: number;
@@ -253,11 +254,13 @@ export default function SwimmerProfilePage() {
 
   if (loading) {
     return (
-      <main style={pageStyle}>
-        <section style={notFoundStyle}>
-          <p>Loading swimmer...</p>
-        </section>
-      </main>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={notFoundStyle}>
+            <p>Loading swimmer...</p>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
@@ -267,64 +270,25 @@ export default function SwimmerProfilePage() {
 
   if (error || !swimmer) {
     return (
-      <main style={pageStyle}>
-        <section style={notFoundStyle}>
-          <h1>Swimmer not found</h1>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={notFoundStyle}>
+            <h1>Swimmer not found</h1>
 
-          <p style={mutedTextStyle}>{error}</p>
+            <p style={mutedTextStyle}>{error}</p>
 
-          <Link href="/swimmers" style={buttonLinkStyle}>
-            Back to Swimmers
-          </Link>
-        </section>
-      </main>
+            <Link href="/swimmers" style={buttonLinkStyle}>
+              Back to Swimmers
+            </Link>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
   return (
-    <main style={pageStyle}>
-      {/* Sidebar */}
-
-      <aside style={sidebarStyle}>
-        <h2 style={{ margin: 0 }}>ROGUEWAVE</h2>
-
-        <p style={sidebarSubtitleStyle}>Coaching Management</p>
-
-        <nav style={navStyle}>
-          <Link href="/home" style={linkStyle}>
-            Home
-          </Link>
-
-          <Link
-            href="/swimmers"
-            style={{
-              ...linkStyle,
-              ...activeLinkStyle,
-            }}
-          >
-            Swimmers
-          </Link>
-
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
-          </Link>
-
-          <Link href="/attendance" style={linkStyle}>
-            Attendance
-          </Link>
-
-          <Link href="/my-info" style={linkStyle}>
-            My Info
-          </Link>
-
-          <Link href="/settings" style={linkStyle}>
-            Settings
-          </Link>
-        </nav>
-      </aside>
-
+    <AppShell>
       {/* Main */}
-
       <section style={mainContentStyle}>
         {/* Header */}
 
@@ -499,7 +463,7 @@ export default function SwimmerProfilePage() {
           </Link>
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -579,41 +543,7 @@ const pageStyle = {
   fontFamily: "Arial, sans-serif",
 };
 
-const sidebarStyle = {
-  width: "220px",
-  flexShrink: 0,
-  backgroundColor: "var(--sidebar)",
-  color: "var(--sidebar-text)",
-  padding: "30px 20px",
-};
-
-const sidebarSubtitleStyle = {
-  color: "var(--sidebar-secondary-text)",
-  fontSize: "13px",
-  marginTop: "5px",
-};
-
-const navStyle = {
-  display: "flex",
-  flexDirection: "column" as const,
-  gap: "8px",
-  marginTop: "35px",
-};
-
-const linkStyle = {
-  color: "var(--sidebar-text)",
-  textDecoration: "none",
-  fontSize: "16px",
-  padding: "10px 12px",
-  borderRadius: "6px",
-};
-
-const activeLinkStyle = {
-  backgroundColor: "rgba(255,255,255,0.12)",
-};
-
 const mainContentStyle = {
-  flex: 1,
   padding: "40px",
   minWidth: 0,
 };

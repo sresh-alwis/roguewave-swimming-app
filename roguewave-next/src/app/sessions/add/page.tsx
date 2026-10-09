@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 type SessionType = "recurring" | "once" | "";
 
@@ -285,7 +286,7 @@ function AddSessionForm() {
   }
 
   return (
-    <main style={pageStyle}>
+    <AppShell>
       <section style={formCardStyle}>
         <div style={headingStyle}>
           <h1
@@ -570,7 +571,7 @@ function AddSessionForm() {
           </div>
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -595,14 +596,6 @@ function getDayNumber(day: string) {
 /* =========================
    STYLES
 ========================= */
-
-const pageStyle = {
-  minHeight: "100vh",
-  backgroundColor: "var(--background)",
-  color: "var(--text)",
-  padding: "clamp(20px, 4vw, 40px)",
-  fontFamily: "Arial, sans-serif",
-};
 
 const formCardStyle = {
   maxWidth: "900px",

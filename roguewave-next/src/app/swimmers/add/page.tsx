@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import AppShell from "@/components/AppShell";
 
 type SwimmingLevel = "" | "Beginner" | "Intermediate" | "Advanced";
 
@@ -128,7 +129,7 @@ export default function AddSwimmerPage() {
   }
 
   return (
-    <main style={pageStyle}>
+    <AppShell>
       <section style={formCardStyle}>
         {/* Heading */}
 
@@ -301,17 +302,9 @@ export default function AddSwimmerPage() {
           </div>
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
-
-const pageStyle = {
-  minHeight: "100vh",
-  backgroundColor: "var(--background)",
-  color: "var(--text)",
-  padding: "clamp(20px, 4vw, 40px)",
-  fontFamily: "Arial, sans-serif",
-};
 
 const formCardStyle = {
   maxWidth: "900px",

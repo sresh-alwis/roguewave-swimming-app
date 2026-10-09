@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 type SessionType = "recurring" | "once" | "";
 
@@ -416,25 +417,27 @@ export default function EditSessionPage() {
 
   if (error) {
     return (
-      <main style={pageStyle}>
-        <section style={formCardStyle}>
-          <h2>Could not load session</h2>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={formCardStyle}>
+            <h2>Could not load session</h2>
 
-          <p style={subtitleStyle}>{error}</p>
+            <p style={subtitleStyle}>{error}</p>
 
-          <button
-            style={secondaryButtonStyle}
-            onClick={() => router.push("/sessions")}
-          >
-            Back to Sessions
-          </button>
-        </section>
-      </main>
+            <button
+              style={secondaryButtonStyle}
+              onClick={() => router.push("/sessions")}
+            >
+              Back to Sessions
+            </button>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
   return (
-    <main style={pageStyle}>
+    <AppShell>
       <section style={formCardStyle}>
         <div style={headingStyle}>
           <h1
@@ -709,7 +712,7 @@ export default function EditSessionPage() {
           </div>
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

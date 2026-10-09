@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 type Schedule = {
   dayOfWeek: number;
@@ -90,11 +91,13 @@ export default function AttendanceSessionPage() {
 
   if (!mounted) {
     return (
-      <main style={pageStyle}>
-        <section style={cardStyle}>
-          <p>Loading attendance...</p>
-        </section>
-      </main>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={cardStyle}>
+            <p>Loading attendance...</p>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
@@ -254,27 +257,31 @@ function AttendanceContent({
 
   if (loading) {
     return (
-      <main style={pageStyle}>
-        <section style={cardStyle}>
-          <p>Loading attendance...</p>
-        </section>
-      </main>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={cardStyle}>
+            <p>Loading attendance...</p>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
   if (error || !session) {
     return (
-      <main style={pageStyle}>
-        <section style={cardStyle}>
-          <h1>Session not found</h1>
+      <AppShell>
+        <main style={pageStyle}>
+          <section style={cardStyle}>
+            <h1>Session not found</h1>
 
-          <p style={helperTextStyle}>{error}</p>
+            <p style={helperTextStyle}>{error}</p>
 
-          <Link href="/attendance" style={buttonLinkStyle}>
-            Back to Attendance
-          </Link>
-        </section>
-      </main>
+            <Link href="/attendance" style={buttonLinkStyle}>
+              Back to Attendance
+            </Link>
+          </section>
+        </main>
+      </AppShell>
     );
   }
 
@@ -517,7 +524,7 @@ function AttendanceContent({
   }
 
   return (
-    <main style={pageStyle}>
+    <AppShell>
       <section style={cardStyle}>
         {/* Header */}
         <div style={headerStyle}>
@@ -795,7 +802,7 @@ function AttendanceContent({
           </Link>
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

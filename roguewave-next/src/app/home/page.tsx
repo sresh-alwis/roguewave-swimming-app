@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import AppShell from "@/components/AppShell";
 
 type CalendarOccurrence = {
   session_id: number;
@@ -153,46 +154,7 @@ function HomeContent({
   const summary = homeData?.summary;
 
   return (
-    <main style={pageStyle}>
-      {/* Sidebar */}
-      <aside style={sidebarStyle}>
-        <h2 style={{ margin: 0 }}>ROGUEWAVE</h2>
-
-        <p style={sidebarSubtitleStyle}>Coaching Management</p>
-
-        <nav style={navStyle}>
-          <Link
-            href="/home"
-            style={{
-              ...linkStyle,
-              ...activeLinkStyle,
-            }}
-          >
-            Home
-          </Link>
-
-          <Link href="/swimmers" style={linkStyle}>
-            Swimmers
-          </Link>
-
-          <Link href="/sessions" style={linkStyle}>
-            Sessions
-          </Link>
-
-          <Link href="/attendance" style={linkStyle}>
-            Attendance
-          </Link>
-
-          <Link href="/my-info" style={linkStyle}>
-            My Info
-          </Link>
-
-          <Link href="/settings" style={linkStyle}>
-            Settings
-          </Link>
-        </nav>
-      </aside>
-
+    <AppShell>
       {/* Main */}
       <section style={mainContentStyle}>
         {/* Header */}
@@ -497,7 +459,7 @@ function HomeContent({
           )}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -541,49 +503,7 @@ const errorStyle = {
   marginBottom: "20px",
 };
 
-const pageStyle = {
-  minHeight: "100vh",
-  backgroundColor: "var(--background)",
-  color: "var(--text)",
-  display: "flex",
-  fontFamily: "Arial, sans-serif",
-};
-
-const sidebarStyle = {
-  width: "220px",
-  flexShrink: 0,
-  backgroundColor: "var(--sidebar)",
-  color: "var(--sidebar-text)",
-  padding: "30px 20px",
-};
-
-const sidebarSubtitleStyle = {
-  color: "var(--sidebar-secondary-text)",
-  fontSize: "13px",
-  marginTop: "5px",
-};
-
-const navStyle = {
-  display: "flex",
-  flexDirection: "column" as const,
-  gap: "8px",
-  marginTop: "35px",
-};
-
-const linkStyle = {
-  color: "var(--sidebar-text)",
-  textDecoration: "none",
-  fontSize: "16px",
-  padding: "10px 12px",
-  borderRadius: "6px",
-};
-
-const activeLinkStyle = {
-  backgroundColor: "rgba(255,255,255,0.12)",
-};
-
 const mainContentStyle = {
-  flex: 1,
   padding: "35px",
   minWidth: 0,
 };
