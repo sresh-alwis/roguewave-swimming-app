@@ -372,6 +372,7 @@ a:focus-visible {
 /* ---- Main content area ---- */
 @media (max-width: 768px) {
   .app-main {
+    min-height: 100vh;
     padding-top: 60px; /* space for mobile header */
   }
 }
